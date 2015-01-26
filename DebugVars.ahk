@@ -5,12 +5,13 @@ TODO:
        - put image in column 2 via LVS_EX_SUBITEMIMAGES and LVM_SETITEM
     b) use LVM_GETSUBITEMRECT to position an edit control
        - handle F2, dbl/click, scroll (to hide edit)
-  indent child items via LVITEM.iIndent
   look into LV_SortArrow
   hide Data column and prevent showing it (use HDN_BEGINTRACK notification)
   disable redraw while deleting items
 
 */
+
+#Include <LV_EX>
 
 test_names=
 (
@@ -20,32 +21,18 @@ A_ScriptFullPath
 A_ScriptHwnd
 A_Args
 )
-A_Args := [[42]]
+A_Args := [["A","B"],["C",["D"],"E"]]
 
-global DATA_COLUMN := 3
-Gui Add, ListView, vLV gLV AltSubmit w500 h300, Name|Value|Data
+global DATA_COLUMN := 3, ICON_SIZE := 16
+global hLV
+Gui Add, ListView, vLV gLV hwndhLV AltSubmit w500 h300, Name|Value|Data
 
-il := DllCall("comctl32.dll\ImageList_Create", "int", 11, "int", 11
+il := DllCall("comctl32.dll\ImageList_Create", "int", ICON_SIZE, "int", ICON_SIZE
     , "uint", 0x21, "int", 2, "int", 5, "ptr")
 IL_Add(il, "empty.png")
 IL_Add(il, "plus.png")
 IL_Add(il, "minus.png")
 LV_SetImageList(il)
-
-global LV_Data := []
-LVx_Add(value, args*) {
-    r := LV_Add(args*)
-    LV_Data[r] := {value: value}
-    return r
-}
-LVx_Insert(r, value, args*) {
-    LV_Data.Insert(r, {value: value})
-    return LV_Insert(r, args*)
-}
-LVx_Delete(r) {
-    LV_Data.Remove(r)
-    return LV_Delete(r)
-}
 
 Loop Parse, test_names, `n
 {
@@ -53,11 +40,21 @@ Loop Parse, test_names, `n
 }
 LV_ModifyCol()
 
-InsertProp(r, name, value) {
+Gui Show
+return
+
+GuiClose:
+GuiEscape:
+ExitApp
+
+InsertProp(r, name, value, level:=0) {
     opt := IsObject(value) ? "Icon2" : ""
     valueText := IsObject(value) ? "(object)" : value
-    data := {value: value}, ObjAddRef(&data)
+    data := {value: value, level: level}
+    ObjAddRef(&data)
     LV_Insert(r, opt, name, valueText, &data)
+    if level
+        LV_EX_SetItemIndent(hLV, r, level)
 }
 DeleteProp(r) {
     ObjRelease(&(item := LV_Data(r)))
@@ -67,14 +64,9 @@ DeleteProp(r) {
     return data
 }
 
-InsertObj(r, obj) {
-    n := 0
-    for k,v in obj  {
-        InsertProp(r+(n++), k, v)
-    }
-    return n
-}
-
+LV:
+LV()
+return
 LV() {
     if (A_GuiEvent != "Normal" && A_GuiEvent != "DoubleClick")
         return
@@ -99,20 +91,15 @@ LV_Data(r) {
 ExpandContract(r) {
     if !IsObject((item := LV_Data(r)).value)
         return
-    item.expanded := !item.expanded
-    LV_Modify(r, "Icon" (2+item.expanded))
-    if item.expanded {
-        item.numChildren := InsertObj(r+1, item.value)
+    if item.expanded := !item.expanded {
+        n := 0, level := item.level + 1
+        for k,v in item.value
+            InsertProp(r+(++n), k, v, level)
+        item.numChildren := n
     } else {
-        Loop % item.numChildren {
+        Loop % item.numChildren
             child := DeleteProp(r+1)
-        }
-            
+        item.numChildren := 0
     }
-}
-
-Gui Show
-
-GuiClose() {
-    ExitApp
+    LV_Modify(r, "Icon" (2+item.expanded))
 }
