@@ -7,7 +7,6 @@ TODO:
        - handle F2, dbl/click, scroll (to hide edit)
   look into LV_SortArrow
   hide Data column and prevent showing it (use HDN_BEGINTRACK notification)
-  disable redraw while deleting items
 
 */
 
@@ -71,11 +70,10 @@ LV() {
     if (A_GuiEvent != "Normal" && A_GuiEvent != "DoubleClick")
         return
     static LVM_SUBITEMHITTEST := 0x1039, LVHT_ONITEMICON := 2
-    GuiControlGet hwnd, Hwnd, LV
     VarSetCapacity(hti, 24, 0)
     DllCall("GetCursorPos", "ptr", &hti)
-    DllCall("ScreenToClient", "ptr", hwnd, "ptr", &hti)
-    SendMessage LVM_SUBITEMHITTEST, 0, &hti,, ahk_id %hwnd%
+    DllCall("ScreenToClient", "ptr", hLV, "ptr", &hti)
+    SendMessage LVM_SUBITEMHITTEST, 0, &hti,, ahk_id %hLV%
     if NumGet(hti, 8, "int") = LVHT_ONITEMICON {
         r0 := NumGet(hti, 12, "int")
         if r0 >= 0
@@ -91,6 +89,8 @@ LV_Data(r) {
 ExpandContract(r) {
     if !IsObject((item := LV_Data(r)).value)
         return
+    static WM_SETREDRAW := 0x000B
+    SendMessage WM_SETREDRAW, false,,, ahk_id %hLV%
     if item.expanded := !item.expanded {
         n := 0, level := item.level + 1
         for k,v in item.value
@@ -102,4 +102,5 @@ ExpandContract(r) {
         item.numChildren := 0
     }
     LV_Modify(r, "Icon" (2+item.expanded))
+    SendMessage WM_SETREDRAW, true,,, ahk_id %hLV%
 }
