@@ -1,6 +1,5 @@
 ﻿/*
 TODO:
-  disable sorting (stuffs up the hierarchy)
   hide Data column and prevent showing it (use HDN_BEGINTRACK notification)
 
 */
@@ -22,7 +21,9 @@ global OBJECT_STRING := "(object)"
 
 global hLV, hGui, hLVEdit
 Gui Add, Edit, vLVEdit hwndhLVEdit Hidden
-Gui Add, ListView, xp yp vLV gLV hwndhLV AltSubmit w500 h300 +0x4000000, Name|Value|Data
+Gui Add, ListView, xp yp vLV gLV hwndhLV AltSubmit w500 h300
+    ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
+    +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value|Data
 Gui -DPIScale +hwndhGui
 
 il := DllCall("comctl32.dll\ImageList_Create", "int", ICON_SIZE, "int", ICON_SIZE
