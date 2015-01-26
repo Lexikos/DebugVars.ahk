@@ -5,7 +5,7 @@ TODO:
        - put image in column 2 via LVS_EX_SUBITEMIMAGES and LVM_SETITEM
     b) use LVM_GETSUBITEMRECT to position an edit control
        - handle F2, dbl/click, scroll (to hide edit)
-  look into LV_SortArrow
+  disable sorting (stuffs up the hierarchy)
   hide Data column and prevent showing it (use HDN_BEGINTRACK notification)
 
 */
