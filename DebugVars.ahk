@@ -1,6 +1,9 @@
 ﻿/*
 TODO:
-  hide Data column and prevent showing it (use HDN_BEGINTRACK notification)
+  fix Edit positioning when the list item is wider than the control
+    - scroll horizontally to maximize the visible part of the value?
+    - "truncate" the Edit control at LV's right edge
+  show a separate dialog for editing really large (or multi-line) values
 
 */
 
@@ -37,12 +40,25 @@ Loop Parse, test_names, `n
 {
     InsertProp(A_Index, A_LoopField, %A_LoopField%)
 }
+
 LV_ModifyCol()
+LV_ModifyCol(COL_DATA, 0)
+AutoSizeValueColumn()
+
+AutoSizeValueColumn(min_width:=0) {
+    VarSetCapacity(rect, 16, 0)
+    DllCall("GetClientRect", "ptr", hLV, "ptr", &rect)
+    value_width := NumGet(rect,8,"int") - LV_EX_GetColumnWidth(hLV, COL_NAME)
+    if (value_width < min_width)
+        value_width := min_width
+    LV_ModifyCol(COL_VALUE, value_width)
+}
 
 OnMessage(0x100, "OnKeyDown")
 OnMessage(0x111, "OnWmCommand")
 OnMessage(0x201, "OnLButtonDown")
 OnMessage(0x203, "OnLButtonDown") ; DBLCLK
+OnMessage(0x4E, "OnWmNotify")
 
 Gui Show
 return
@@ -112,7 +128,7 @@ LV_Data(r) {
 ExpandContract(r) {
     if !IsObject((item := LV_Data(r)).value)
         return
-    GuiControl, -Redraw, LV
+    GuiControl -Redraw, LV
     if item.expanded := !item.expanded {
         n := 0, level := item.level + 1
         for k,v in item.value
@@ -124,7 +140,7 @@ ExpandContract(r) {
         item.numChildren := 0
     }
     LV_Modify(r, "Icon" (2+item.expanded))
-    GuiControl, +Redraw, LV
+    GuiControl +Redraw, LV
 }
 
 global EditRow
@@ -162,14 +178,14 @@ SaveEdit() {
     item := LV_Data(r)
     if IsObject(item.value) && value == OBJECT_STRING
         return CancelEdit()
-    GuiControl, -Redraw, LV
+    GuiControl -Redraw, LV
     EditRow := ""
     GuiControl Hide, LVEdit
     item.value := value
     LV_GetText(name, r, COL_NAME)
     DeleteProp(r)
     InsertProp(r, name, item.value, item.level)
-    GuiControl, +Redraw, LV
+    GuiControl +Redraw, LV
 }
 IsEditing() {
     ; return DllCall("IsWindowVisible", "ptr", hLVEdit)
@@ -207,3 +223,39 @@ OnWmCommand(wParam, lParam) {
         ;else: focus was killed as a result of cancelling.
     }
 }
+
+OnWmNotify(wParam, lParam) {
+    Critical
+    code := NumGet(lParam + A_PtrSize*2, "int")
+    if (code = -306 || code = -326) { ; HDN_BEGINTRACK A|W
+        item := NumGet(lParam + A_PtrSize*3, "int") + 1
+        if (item = COL_NAME) {
+            LV_ModifyCol(COL_VALUE) ; See below.
+            return false
+        }
+        return true ; Prevent tracking.
+    }
+    if (code = -306 || code = -327) { ; HDN_ENDTRACK A|W
+        ; This must be the Name column, since otherwise tracking was prevented.
+        ; Auto-size the Value column so that it fills the available space, but
+        ; don't shrink it smaller than the size set when tracking began above;
+        ; i.e. the size of the widest value.  It was set when tracking began
+        ; to avoid the effect of the scroll bar shrinking when tracking ends.
+        AutoSizeValueColumn(LV_EX_GetColumnWidth(hLV, COL_VALUE))
+        return true
+    }
+}
+
+/*
+; Not using this code for now since it requires Vista, and basically
+; the only advantage is that the cursor doesn't change to <-> when you
+; mouse over the column divider.
+LV_ModifyCol(COL_DATA, 1)  ; Must be non-zero.
+LVM_SETCOLUMN := 0x1000 + (A_IsUnicode ? 96 : 26)
+LVCF_FMT := 1
+LVCFMT_FIXED_WIDTH := 0x100
+VarSetCapacity(lvcol, 40+A_PtrSize*2, 0)
+NumPut(LVCF_FMT, lvcol, 0, "uint")
+NumPut(LVCFMT_FIXED_WIDTH, lvcol, 4, "int")
+SendMessage LVM_SETCOLUMN, COL_DATA-1, &lvcol,, ahk_id %hLV%
+*/
