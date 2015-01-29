@@ -1,9 +1,7 @@
 ﻿/*
 TODO:
-  fix Edit positioning when the list item is wider than the control
-    - scroll horizontally to maximize the visible part of the value?
-    - "truncate" the Edit control at LV's right edge
   show a separate dialog for editing really large (or multi-line) values
+  consider how to display `n and other such characters
 
 */
 
@@ -17,7 +15,7 @@ A_ScriptFullPath
 A_ScriptHwnd
 A_Args
 )
-A_Args := [["A","B"],["C",["D"],"E"]]
+A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
 
 global COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
 global OBJECT_STRING := "(object)"
@@ -149,16 +147,36 @@ BeginEdit(r) {
     item := LV_Data(r)
     static LVIR_LABEL := 2
     static LVM_GETSUBITEMRECT := 0x1038
-    VarSetCapacity(RECT, 16, 0)
-    NumPut(LVIR_LABEL, RECT, 0, "int")
-    NumPut(COL_VALUE-1, RECT, 4, "int")
-    SendMessage LVM_GETSUBITEMRECT, r-1, &RECT,, ahk_id %hLV%
+    VarSetCapacity(rect, 16, 0)
+    NumPut(LVIR_LABEL, rect, 0, "int")
+    NumPut(COL_VALUE-1, rect, 4, "int")
+    SendMessage LVM_GETSUBITEMRECT, r-1, &rect,, ahk_id %hLV%
     if !ErrorLevel
         return
-    DllCall("MapWindowPoints", "ptr", hLV, "ptr", hGui, "ptr", &RECT, "uint", 2)
-    rL := NumGet(RECT, 0, "int"), rT := NumGet(RECT, 4, "int")
-    rR := NumGet(RECT, 8, "int"), rB := NumGet(RECT, 12, "int")
-    rW := rR - rL, rH := rB - rT, rL++, rR++
+    ; Scroll whole field into view if needed
+    rL := NumGet(rect, 0, "int"), rR := NumGet(rect, 8, "int")
+    VarSetCapacity(client_rect, 16, 0)
+    DllCall("GetClientRect", "ptr", hLV, "ptr", &client_rect)
+    client_width := NumGet(client_rect, 8, "int")
+    if (rR > client_width) {
+        delta := rR - client_width
+        if (delta > rL)
+            delta := rL
+        static LVM_SCROLL := 0x1014
+        SendMessage LVM_SCROLL, delta, 0,, ahk_id %hLV%
+        NumPut(rL - delta, rect, 0, "int")
+        NumPut(rR - delta, rect, 8, "int")
+        Sleep 100
+    }
+    ; Convert coordinates
+    DllCall("MapWindowPoints", "ptr", hLV, "ptr", hGui, "ptr", &rect, "uint", 2)
+    rL := NumGet(rect, 0, "int"), rT := NumGet(rect, 4, "int")
+    rR := NumGet(rect, 8, "int"), rB := NumGet(rect, 12, "int")
+    rW := rR - rL - 2, rH := rB - rT, rL += 3, rR += 3
+    ; Limit width to visible area when value column is very wide
+    if (rW > client_width)
+        rW := client_width
+    ; Move the edit control into position and show it
     GuiControl,, LVEdit, % IsObject(item.value) ? OBJECT_STRING : item.value
     GuiControl Move, LVEdit, x%rL% y%rT% w%rW% h%rH%
     GuiControl Show, LVEdit
@@ -188,8 +206,8 @@ SaveEdit() {
     GuiControl +Redraw, LV
 }
 IsEditing() {
-    ; return DllCall("IsWindowVisible", "ptr", hLVEdit)
-    return (EditRow != "")
+    return DllCall("IsWindowVisible", "ptr", hLVEdit)
+    ; return (EditRow != "")
 }
 
 OnKeyDown(wParam, lParam) {
