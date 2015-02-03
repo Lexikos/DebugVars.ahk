@@ -36,7 +36,7 @@ LV_SetImageList(il)
 
 Loop Parse, test_names, `n
 {
-    InsertProp(A_Index, A_LoopField, %A_LoopField%)
+    InsertProp(A_Index, {name: A_LoopField, value: %A_LoopField%, level: 0})
 }
 
 LV_ModifyCol()
@@ -65,21 +65,31 @@ GuiEscape:
 GuiClose:
 ExitApp
 
-InsertProp(r, name, value, level:=0) {
-    opt := IsObject(value) ? "Icon2" : ""
-    valueText := IsObject(value) ? OBJECT_STRING : value
-    data := {value: value, level: level}
-    ObjAddRef(&data)
-    LV_Insert(r, opt, name, valueText, &data)
-    if level
-        LV_EX_SetItemIndent(hLV, r, level)
+InsertProp(r, item) {
+    opt := IsObject(item.value) ? "Icon" (item.expanded ? 3 : 2) : ""
+    valueText := IsObject(item.value) ? OBJECT_STRING : item.value
+    ObjAddRef(&item)
+    LV_Insert(r, opt, item.name, valueText, &item)
+    if item.level
+        LV_EX_SetItemIndent(hLV, r, item.level)
+    if item.expanded
+        InsertChildren(r+1, item)
 }
-DeleteProp(r) {
+RemoveProp(r) {
     ObjRelease(&(item := LV_Data(r)))
     LV_Delete(r)
-    Loop % item.numChildren
-        DeleteProp(r)
-    return data
+    RemoveChildren(r, item)
+    return item
+}
+InsertChildren(r, item) {
+    for _,child in item.children {
+        InsertProp(r, child)
+        r += 1 + Round(child.children.MaxIndex())
+    }
+}
+RemoveChildren(r, item) {
+    Loop % item.children.MaxIndex()
+        RemoveProp(r)
 }
 
 LV:
@@ -106,6 +116,7 @@ OnLButtonDown(wParam, lParam, msg, hwnd) {
         return
     c := NumGet(hti, 16, "int") + 1
     if (where = LVHT_ONITEMICON) {
+        GuiControl Focus, LV
         ExpandContract(r)
         return true
     }
@@ -128,16 +139,17 @@ ExpandContract(r) {
         return
     GuiControl -Redraw, LV
     if item.expanded := !item.expanded {
-        n := 0, level := item.level + 1
-        for k,v in item.value
-            InsertProp(r+(++n), k, v, level)
-        item.numChildren := n
+        if !item.children {
+            items := item.children := []
+            level := item.level + 1
+            for k,v in item.value
+                items.Insert({name: k, value: v, level: level})
+        }
+        InsertChildren(r+1, item)
     } else {
-        Loop % item.numChildren
-            child := DeleteProp(r+1)
-        item.numChildren := 0
+        RemoveChildren(r+1, item)
     }
-    LV_Modify(r, "Icon" (2+item.expanded))
+    LV_Modify(r, "Focus Icon" (2+item.expanded))
     GuiControl +Redraw, LV
 }
 
@@ -200,9 +212,8 @@ SaveEdit() {
     EditRow := ""
     GuiControl Hide, LVEdit
     item.value := value
-    LV_GetText(name, r, COL_NAME)
-    DeleteProp(r)
-    InsertProp(r, name, item.value, item.level)
+    RemoveProp(r)
+    InsertProp(r, item)
     GuiControl +Redraw, LV
 }
 IsEditing() {
