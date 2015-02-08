@@ -224,26 +224,72 @@ IsEditing() {
 }
 
 OnKeyDown(wParam, lParam) {
-    if (A_GuiControl = "LVEdit") {
-        static VK_RETURN := 0x0D
-        if (wParam = VK_RETURN) {
-            SaveEdit()
-            return true
-        }
-        static VK_ESCAPE := 0x1B
-        if (wParam = VK_ESCAPE) {
-            CancelEdit()
-            return true
-        }
-    }
+    key := GetKeyName(vksc := Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
     if (A_GuiControl = "LV") {
-        static VK_F2 := 0x71
-        if (wParam = VK_F2) {
-            if r := LV_GetNext(0, "F")
+        if !(r := LV_GetNext(0, "F")) {
+            if (key = "Tab") {
+                LV_Modify(1, "Select Focus")
+                return true
+            }
+            return
+        }
+        item := LV_Data(r)
+    }
+    if IsLabel(A_GuiControl "_" key)
+        goto % A_GuiControl "_" key
+    return
+    
+    LVEdit_Enter:
+    LVEdit_Tab:
+        r := EditRow
+        SaveEdit()
+        if !(GetKeyState("Shift") || r=LV_GetCount())
+            r += 1
+        LV_Modify(r, "Select Focus")
+        return true
+    
+    LVEdit_Escape:
+        CancelEdit()
+        return true
+    
+    LV_Tab:
+    LV_Enter:
+        if GetKeyState("Shift") && key = "Tab" {
+            if (r = 1)
+                return
+            LV_Modify(--r, "Select Focus")
+            if !IsObject(LV_Data(r).value)
                 BeginEdit(r)
             return true
         }
-    }
+        if !IsObject(item.value) {
+            BeginEdit(r)
+            return true
+        }
+        if !item.expanded
+            ExpandContract(r)
+        LV_Modify(r+1, "Select Focus")
+        return true
+    
+    LV_Left:
+        if item.expanded {
+            ExpandContract(r)
+            return true
+        }
+        loop
+            r -= 1
+        until r < 1 || LV_Data(r).level < item.level
+        if r
+            LV_Modify(r, "Select Focus")
+        return true
+    
+    LV_Right:
+        if IsObject(item.value)
+            if item.expanded
+                LV_Modify(r+1, "Select Focus")
+            else
+                ExpandContract(r)
+        return true
 }
 
 OnWmCommand(wParam, lParam) {
