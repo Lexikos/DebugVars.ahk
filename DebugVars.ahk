@@ -213,8 +213,10 @@ SaveEdit() {
     GuiControl -Redraw, LV
     EditRow := ""
     GuiControl Hide, LVEdit
-    item.value := value
     RemoveProp(r)
+    item.value := value
+    item.children := ""
+    item.expanded := false
     InsertProp(r, item)
     GuiControl +Redraw, LV
 }
