@@ -78,13 +78,16 @@ InsertProp(r, item) {
 RemoveProp(r) {
     ObjRelease(&(item := LV_Data(r)))
     LV_Delete(r)
-    RemoveChildren(r, item)
+    if item.expanded
+        RemoveChildren(r, item)
     return item
 }
 InsertChildren(r, item) {
     for _,child in item.children {
         InsertProp(r, child)
-        r += 1 + Round(child.children.MaxIndex())
+        r += 1
+        if child.expanded
+            r += Round(child.children.MaxIndex())
     }
 }
 RemoveChildren(r, item) {
@@ -122,7 +125,6 @@ OnLButtonDown(wParam, lParam, msg, hwnd) {
     }
     if (where = LVHT_ONITEMLABEL && c == COL_VALUE
         && LV_GetNext(r-1) == r) { ; Was already selected.
-        ; && selection == r && (A_TickCount - selectedAt) > 100) {
         BeginEdit(r)
         return true
     }
@@ -149,7 +151,7 @@ ExpandContract(r) {
     } else {
         RemoveChildren(r+1, item)
     }
-    LV_Modify(r, "Focus Icon" (2+item.expanded))
+    LV_Modify(r, "Select Focus Icon" (2+item.expanded))
     GuiControl +Redraw, LV
 }
 
