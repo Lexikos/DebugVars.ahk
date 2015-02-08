@@ -145,7 +145,7 @@ ExpandContract(r) {
             items := item.children := []
             level := item.level + 1
             for k,v in item.value
-                items.Insert({name: k, value: v, level: level})
+                items.Insert({name: k, value: v, level: level, parent: item, base: deletenotify})
         }
         InsertChildren(r+1, item)
     } else {
@@ -213,6 +213,10 @@ SaveEdit() {
     GuiControl -Redraw, LV
     EditRow := ""
     GuiControl Hide, LVEdit
+    ; Update the object
+    if item.parent
+        item.parent.value[item.name] := value
+    ; Update the node
     RemoveProp(r)
     item.value := value
     item.children := ""
@@ -338,3 +342,9 @@ NumPut(LVCF_FMT, lvcol, 0, "uint")
 NumPut(LVCFMT_FIXED_WIDTH, lvcol, 4, "int")
 SendMessage LVM_SETCOLUMN, COL_DATA-1, &lvcol,, ahk_id %hLV%
 */
+
+class deletenotify {
+    __delete() {
+        MsgBox % "Deleting " this.name
+    }
+}
