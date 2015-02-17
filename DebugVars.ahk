@@ -145,7 +145,7 @@ ExpandContract(r) {
             items := item.children := []
             level := item.level + 1
             for k,v in item.value
-                items.Insert({name: k, value: v, level: level, parent: item, base: deletenotify})
+                items.Insert({name: k, value: v, level: level, parent: item})
         }
         InsertChildren(r+1, item)
     } else {
@@ -342,9 +342,3 @@ NumPut(LVCF_FMT, lvcol, 0, "uint")
 NumPut(LVCFMT_FIXED_WIDTH, lvcol, 4, "int")
 SendMessage LVM_SETCOLUMN, COL_DATA-1, &lvcol,, ahk_id %hLV%
 */
-
-class deletenotify {
-    __delete() {
-        MsgBox % "Deleting " this.name
-    }
-}
