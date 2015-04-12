@@ -5,340 +5,439 @@ TODO:
 
 */
 
-#Include <LV_EX>
+#Warn,, StdOut
+global A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
 
-test_names=
-(
-A_ScriptDir
-A_ScriptName
-A_ScriptFullPath
-A_ScriptHwnd
-A_Args
-)
-A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
-
-global COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
-global OBJECT_STRING := "(object)"
-
-global hLV, hGui, hLVEdit
-Gui Add, Edit, vLVEdit hwndhLVEdit Hidden
-Gui Add, ListView, xp yp vLV gLV hwndhLV AltSubmit w500 h300
-    ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
-    +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value|Data
-Gui -DPIScale +hwndhGui
-
-il := DllCall("comctl32.dll\ImageList_Create", "int", ICON_SIZE, "int", ICON_SIZE
-    , "uint", 0x21, "int", 2, "int", 5, "ptr")
-IL_Add(il, "empty.png")
-IL_Add(il, "plus.png")
-IL_Add(il, "minus.png")
-LV_SetImageList(il)
-
-Loop Parse, test_names, `n
-{
-    InsertProp(A_Index, {name: A_LoopField, value: %A_LoopField%, level: 0})
-}
-
-LV_ModifyCol()
-LV_ModifyCol(COL_DATA, 0)
-AutoSizeValueColumn()
-
-AutoSizeValueColumn(min_width:=0) {
-    VarSetCapacity(rect, 16, 0)
-    DllCall("GetClientRect", "ptr", hLV, "ptr", &rect)
-    value_width := NumGet(rect,8,"int") - LV_EX_GetColumnWidth(hLV, COL_NAME)
-    if (value_width < min_width)
-        value_width := min_width
-    LV_ModifyCol(COL_VALUE, value_width)
-}
-
-OnMessage(0x100, "OnKeyDown")
-OnMessage(0x111, "OnWmCommand")
-OnMessage(0x201, "OnLButtonDown")
-OnMessage(0x203, "OnLButtonDown") ; DBLCLK
-OnMessage(0x4E, "OnWmNotify")
-
-Gui Show
-return
-
-GuiEscape:
-GuiClose:
+dv := new DebugVars(TestVarProvider)
+dv.Show(), dv := ""
+while DebugVars.Instances.MaxIndex()
+    Sleep 1000
 ExitApp
 
-InsertProp(r, item) {
-    opt := IsObject(item.value) ? "Icon" (item.expanded ? 3 : 2) : ""
-    valueText := IsObject(item.value) ? OBJECT_STRING : item.value
-    ObjAddRef(&item)
-    LV_Insert(r, opt, item.name, valueText, &item)
-    if item.level
-        LV_EX_SetItemIndent(hLV, r, item.level)
-    if item.expanded
-        InsertChildren(r+1, item)
-}
-RemoveProp(r) {
-    ObjRelease(&(item := LV_Data(r)))
-    LV_Delete(r)
-    if item.expanded
-        RemoveChildren(r, item)
-    return item
-}
-InsertChildren(r, item) {
-    for _,child in item.children {
-        InsertProp(r, child)
-        r += 1
-        if child.expanded
-            r += Round(child.children.MaxIndex())
-    }
-}
-RemoveChildren(r, item) {
-    Loop % item.children.MaxIndex()
-        RemoveProp(r)
-}
-
-LV:
-LV()
-return
-LV() {
-    if (A_GuiEvent = "s") ; S (start scroll) or s (stop scroll)
-        if IsEditing()
-            SaveEdit()
-}
-OnLButtonDown(wParam, lParam, msg, hwnd) {
-    if (hwnd != hLV)
-        return
-    static LVM_SUBITEMHITTEST := 0x1039
-    static LVHT_ONITEMICON := 2
-    static LVHT_ONITEMLABEL := 4
-    VarSetCapacity(hti, 24, 0)
-    NumPut(lParam & 0xFFFF, hti, 0, "short")
-    NumPut(lParam >> 16, hti, 4, "short")
-    SendMessage LVM_SUBITEMHITTEST, 0, &hti,, ahk_id %hLV%
-    where := NumGet(hti, 8, "int")
-    r := NumGet(hti, 12, "int") + 1
-    if (!r)
-        return
-    c := NumGet(hti, 16, "int") + 1
-    if (where = LVHT_ONITEMICON) {
-        GuiControl Focus, LV
-        ExpandContract(r)
-        return true
-    }
-    if (where = LVHT_ONITEMLABEL && c == COL_VALUE
-        && LV_GetNext(r-1) == r) { ; Was already selected.
-        BeginEdit(r)
-        return true
+class ThrowMissingMethod {
+    __Call(name) {
+        throw Exception("Unknown method", -1, name)
     }
 }
 
-LV_Data(r) {
-    if LV_GetText(data, r, COL_DATA)
-        return Object(data)
-    throw Exception("Bad row", -1, r)
-}
-
-ExpandContract(r) {
-    if !IsObject((item := LV_Data(r)).value)
-        return
-    GuiControl -Redraw, LV
-    if item.expanded := !item.expanded {
-        if !item.children {
-            items := item.children := []
-            level := item.level + 1
-            for k,v in item.value
-                items.Insert({name: k, value: v, level: level, parent: item})
-        }
-        InsertChildren(r+1, item)
-    } else {
-        RemoveChildren(r+1, item)
+class TestVarProvider extends ThrowMissingMethod
+{
+    GetRoot() {
+        if this.root
+            return this.root
+        test_names =
+        (LTrim
+            A_ScriptDir
+            A_ScriptName
+            A_ScriptFullPath
+            A_ScriptHwnd
+            A_Args
+        )
+        value := {}
+        Loop Parse, test_names, `n
+            value[A_LoopField] := %A_LoopField%
+        return this.root := {value: value}
     }
-    LV_Modify(r, "Select Focus Icon" (2+item.expanded))
-    GuiControl +Redraw, LV
-}
-
-global EditRow
-BeginEdit(r) {
-    EditRow := r
-    item := LV_Data(r)
-    static LVIR_LABEL := 2
-    static LVM_GETSUBITEMRECT := 0x1038
-    VarSetCapacity(rect, 16, 0)
-    NumPut(LVIR_LABEL, rect, 0, "int")
-    NumPut(COL_VALUE-1, rect, 4, "int")
-    SendMessage LVM_GETSUBITEMRECT, r-1, &rect,, ahk_id %hLV%
-    if !ErrorLevel
-        return
-    ; Scroll whole field into view if needed
-    rL := NumGet(rect, 0, "int"), rR := NumGet(rect, 8, "int")
-    VarSetCapacity(client_rect, 16, 0)
-    DllCall("GetClientRect", "ptr", hLV, "ptr", &client_rect)
-    client_width := NumGet(client_rect, 8, "int")
-    if (rR > client_width) {
-        delta := rR - client_width
-        if (delta > rL)
-            delta := rL
-        static LVM_SCROLL := 0x1014
-        SendMessage LVM_SCROLL, delta, 0,, ahk_id %hLV%
-        NumPut(rL - delta, rect, 0, "int")
-        NumPut(rR - delta, rect, 8, "int")
-        Sleep 100
-    }
-    ; Convert coordinates
-    DllCall("MapWindowPoints", "ptr", hLV, "ptr", hGui, "ptr", &rect, "uint", 2)
-    rL := NumGet(rect, 0, "int"), rT := NumGet(rect, 4, "int")
-    rR := NumGet(rect, 8, "int"), rB := NumGet(rect, 12, "int")
-    rW := rR - rL - 2, rH := rB - rT, rL += 3, rR += 3
-    ; Limit width to visible area when value column is very wide
-    if (rW > client_width)
-        rW := client_width
-    ; Move the edit control into position and show it
-    GuiControl,, LVEdit, % IsObject(item.value) ? OBJECT_STRING : item.value
-    GuiControl Move, LVEdit, x%rL% y%rT% w%rW% h%rH%
-    GuiControl Show, LVEdit
-    GuiControl Focus, LVEdit
-    static EM_SETSEL := 0xB1
-    SendMessage EM_SETSEL, 0, -1,, ahk_id %hLVEdit%
-}
-CancelEdit() {
-    EditRow := ""
-    GuiControl Hide, LVEdit
-}
-SaveEdit() {
-    if !EditRow
-        throw Exception("Not editing", -1)
-    r := EditRow
-    GuiControlGet value,, LVEdit
-    item := LV_Data(r)
-    if IsObject(item.value) && value == OBJECT_STRING
-        return CancelEdit()
-    GuiControl -Redraw, LV
-    EditRow := ""
-    GuiControl Hide, LVEdit
-    ; Update the object
-    if item.parent
-        item.parent.value[item.name] := value
-    ; Update the node
-    RemoveProp(r)
-    item.value := value
-    item.children := ""
-    item.expanded := false
-    InsertProp(r, item)
-    GuiControl +Redraw, LV
-}
-IsEditing() {
-    return DllCall("IsWindowVisible", "ptr", hLVEdit)
-    ; return (EditRow != "")
-}
-
-OnKeyDown(wParam, lParam) {
-    key := GetKeyName(vksc := Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
-    if (A_GuiControl = "LV") {
-        if !(r := LV_GetNext(0, "F")) {
-            if (key = "Tab") {
-                LV_Modify(1, "Select Focus")
-                return true
-            }
-            return
-        }
-        item := LV_Data(r)
-    }
-    if IsLabel(A_GuiControl "_" key)
-        goto % A_GuiControl "_" key
-    return
     
-    LVEdit_Enter:
-    LVEdit_Tab:
-        r := EditRow
-        SaveEdit()
-        if !(GetKeyState("Shift") || r=LV_GetCount())
-            r += 1
-        LV_Modify(r, "Select Focus")
-        return true
-    
-    LVEdit_Escape:
-        CancelEdit()
-        return true
-    
-    LV_Tab:
-    LV_Enter:
-        if GetKeyState("Shift") && key = "Tab" {
-            if (r = 1)
-                return
-            LV_Modify(--r, "Select Focus")
-            if !IsObject(LV_Data(r).value)
-                BeginEdit(r)
-            return true
+    GetChildren(node) {
+        if !nodes := node.children {
+            nodes := node.children := []
+            for k,v in node.value
+                nodes.Push({name: k, value: v, parent: node})
         }
-        if !IsObject(item.value) {
-            BeginEdit(r)
-            return true
-        }
-        if !item.expanded
-            ExpandContract(r)
-        LV_Modify(r+1, "Select Focus")
-        return true
-    
-    LV_Left:
-        if item.expanded {
-            ExpandContract(r)
-            return true
-        }
-        loop
-            r -= 1
-        until r < 1 || LV_Data(r).level < item.level
-        if r
-            LV_Modify(r, "Select Focus")
-        return true
-    
-    LV_Right:
-        if IsObject(item.value)
-            if item.expanded
-                LV_Modify(r+1, "Select Focus")
-            else
-                ExpandContract(r)
-        return true
-}
-
-OnWmCommand(wParam, lParam) {
-    static EN_KILLFOCUS := 0x200
-    if (lParam = hLVEdit && (wParam >> 16) = EN_KILLFOCUS) {
-        if IsEditing()
-            SaveEdit()
-        ;else: focus was killed as a result of cancelling.
+        return nodes
     }
-}
-
-OnWmNotify(wParam, lParam) {
-    Critical
-    code := NumGet(lParam + A_PtrSize*2, "int")
-    if (code = -306 || code = -326) { ; HDN_BEGINTRACK A|W
-        item := NumGet(lParam + A_PtrSize*3, "int") + 1
-        if (item = COL_NAME) {
-            LV_ModifyCol(COL_VALUE) ; See below.
-            return false
-        }
-        return true ; Prevent tracking.
+    
+    HasChildren(node) {
+        return IsObject(node.value)
     }
-    if (code = -306 || code = -327) { ; HDN_ENDTRACK A|W
-        ; This must be the Name column, since otherwise tracking was prevented.
-        ; Auto-size the Value column so that it fills the available space, but
-        ; don't shrink it smaller than the size set when tracking began above;
-        ; i.e. the size of the widest value.  It was set when tracking began
-        ; to avoid the effect of the scroll bar shrinking when tracking ends.
-        AutoSizeValueColumn(LV_EX_GetColumnWidth(hLV, COL_VALUE))
-        return true
+    
+    SetValue(node, value) {
+        if node.parent
+            node.parent.value[node.name] := value
+        node.value := value
     }
 }
 
 /*
-; Not using this code for now since it requires Vista, and basically
-; the only advantage is that the cursor doesn't change to <-> when you
-; mouse over the column divider.
-LV_ModifyCol(COL_DATA, 1)  ; Must be non-zero.
-LVM_SETCOLUMN := 0x1000 + (A_IsUnicode ? 96 : 26)
-LVCF_FMT := 1
-LVCFMT_FIXED_WIDTH := 0x100
-VarSetCapacity(lvcol, 40+A_PtrSize*2, 0)
-NumPut(LVCF_FMT, lvcol, 0, "uint")
-NumPut(LVCFMT_FIXED_WIDTH, lvcol, 4, "int")
-SendMessage LVM_SETCOLUMN, COL_DATA-1, &lvcol,, ahk_id %hLV%
+    DebugVars
+    
+    Public interface:
+        dv := new DebugVars(Provider)
+        dv.Show()
+        dv.Hide()
 */
+class DebugVars extends ThrowMissingMethod
+{
+    static COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
+    static OBJECT_STRING := "(object)"
+    
+    static Instances  ; Hwnd:Object map of visible instances.
+    
+    InitClass() {
+        if this.Instances
+            return
+        this.Instances := {}
+        
+        il := DllCall("comctl32.dll\ImageList_Create"
+            , "int", this.ICON_SIZE, "int", this.ICON_SIZE
+            , "uint", 0x21, "int", 2, "int", 5, "ptr")
+        IL_Add(il, "empty.png")
+        IL_Add(il, "plus.png")
+        IL_Add(il, "minus.png")
+        this.ImageList := il
+        
+        OnMessage(0x100, this.OnKeyDown.Bind(this))
+        OnMessage(0x111, this.OnWmCommand.Bind(this))
+        OnMessage(0x201, lbd := this.OnLButtonDown.Bind(this))
+        OnMessage(0x203, lbd) ; DBLCLK
+        OnMessage(0x4E, this.OnWmNotify.Bind(this))
+    }
+
+    __New(aProvider) {
+        DebugVars.InitClass()
+        this.provider := aProvider
+        
+        Gui New, hwndhGui LabelDebugVars_Gui
+        Gui Add, Edit, hwndhLVEdit Hidden
+        Gui Add, ListView, xp yp hwndhLV AltSubmit w500 h300
+            ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
+            +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value|Data
+        Gui -DPIScale
+        
+        this.hLV     := hLV
+        this.hLVEdit := hLVEdit
+        this.hGui    := hGui
+        
+        LV_SetImageList(DebugVars.ImageList)
+        
+        for i, node in aProvider.GetChildren(aProvider.GetRoot()) {
+            node.level := 0
+            this.InsertProp(A_Index, node)
+        }
+        
+        LV_ModifyCol()
+        LV_ModifyCol(this.COL_DATA, 0)
+        this.AutoSizeValueColumn()
+    }
+    
+    Show() {
+        this.Instances[this.hGui] := this
+        Gui % this.hGui ":Show"
+    }
+    
+    Hide() {
+        Gui % this.hGui ":Hide"
+        DebugVars.RevokeHwnd(this.hGui)
+    }
+    
+    RevokeHwnd(hwnd) {
+        this.Instances.Delete(hwnd)
+    }
+    
+    __Delete() {
+        Gui % this.hGui ":Destroy"
+    }
+    
+    AutoSizeValueColumn(min_width:=0) {
+        VarSetCapacity(rect, 16, 0)
+        DllCall("GetClientRect", "ptr", this.hLV, "ptr", &rect)
+        value_width := NumGet(rect,8,"int") - this.LV_GetColumnWidth(this.COL_NAME)
+        if (value_width < min_width)
+            value_width := min_width
+        LV_ModifyCol(this.COL_VALUE, value_width)
+    }
+
+    InsertProp(r, item) {
+        has_children := this.provider.HasChildren(item)
+        opt := has_children ? "Icon" (item.expanded ? 3 : 2) : ""
+        valueText := has_children ? this.OBJECT_STRING : item.value
+        ObjAddRef(&item)
+        LV_Insert(r, opt, item.name, valueText, &item)
+        if item.level
+            this.LV_SetItemIndent(r, item.level)
+        if item.expanded
+            this.InsertChildren(r+1, item)
+    }
+    RemoveProp(r) {
+        ObjRelease(&(item := this.LV_Data(r)))
+        LV_Delete(r)
+        if item.expanded
+            this.RemoveChildren(r, item)
+        return item
+    }
+    InsertChildren(r, item) {
+        level := item.level + 1
+        for _, child in this.provider.GetChildren(item) {
+            child.level := level
+            this.InsertProp(r, child)
+            r += 1
+            if child.expanded
+                r += child.children.Length()
+        }
+    }
+    RemoveChildren(r, item) {
+        Loop % item.children.Length()
+            this.RemoveProp(r)
+    }
+    
+    OnLButtonDown(wParam, lParam, msg, hwnd) {
+        if !(this := this.Instances[A_Gui])
+            return
+        if (hwnd != this.hLV)
+            return
+        static LVM_SUBITEMHITTEST := 0x1039
+        static LVHT_ONITEMICON := 2
+        static LVHT_ONITEMLABEL := 4
+        VarSetCapacity(hti, 24, 0)
+        NumPut(lParam & 0xFFFF, hti, 0, "short")
+        NumPut(lParam >> 16, hti, 4, "short")
+        SendMessage LVM_SUBITEMHITTEST, 0, &hti,, % "ahk_id " this.hLV
+        where := NumGet(hti, 8, "int")
+        r := NumGet(hti, 12, "int") + 1
+        if (!r)
+            return
+        c := NumGet(hti, 16, "int") + 1
+        if (where = LVHT_ONITEMICON) {
+            GuiControl Focus, % this.hLV
+            this.ExpandContract(r)
+            return true
+        }
+        if (where = LVHT_ONITEMLABEL && c == this.COL_VALUE
+            && LV_GetNext(r-1) == r) { ; Was already selected.
+            this.BeginEdit(r)
+            return true
+        }
+    }
+
+    LV_Data(r) {
+        if LV_GetText(data, r, this.COL_DATA)
+            return Object(data)
+        throw Exception("Bad row", -1, r)
+    }
+
+    ExpandContract(r) {
+        if !IsObject((item := this.LV_Data(r)).value)
+            return
+        GuiControl -Redraw, % this.hLV
+        if item.expanded := !item.expanded
+            this.InsertChildren(r+1, item)
+        else
+            this.RemoveChildren(r+1, item)
+        LV_Modify(r, "Select Focus Icon" (2+item.expanded))
+        GuiControl +Redraw, % this.hLV
+    }
+
+    BeginEdit(r) {
+        this.EditRow := r
+        item := this.LV_Data(r)
+        static LVIR_LABEL := 2
+        static LVM_GETSUBITEMRECT := 0x1038
+        VarSetCapacity(rect, 16, 0)
+        NumPut(LVIR_LABEL, rect, 0, "int")
+        NumPut(this.COL_VALUE-1, rect, 4, "int")
+        SendMessage LVM_GETSUBITEMRECT, r-1, &rect,, % "ahk_id " this.hLV
+        if !ErrorLevel
+            return
+        ; Scroll whole field into view if needed
+        rL := NumGet(rect, 0, "int"), rR := NumGet(rect, 8, "int")
+        VarSetCapacity(client_rect, 16, 0)
+        DllCall("GetClientRect", "ptr", this.hLV, "ptr", &client_rect)
+        client_width := NumGet(client_rect, 8, "int")
+        if (rR > client_width) {
+            delta := rR - client_width
+            if (delta > rL)
+                delta := rL
+            static LVM_SCROLL := 0x1014
+            SendMessage LVM_SCROLL, delta, 0,, % "ahk_id " this.hLV
+            NumPut(rL - delta, rect, 0, "int")
+            NumPut(rR - delta, rect, 8, "int")
+            Sleep 100
+        }
+        ; Convert coordinates
+        DllCall("MapWindowPoints", "ptr", this.hLV, "ptr", this.hGui, "ptr", &rect, "uint", 2)
+        rL := NumGet(rect, 0, "int"), rT := NumGet(rect, 4, "int")
+        rR := NumGet(rect, 8, "int"), rB := NumGet(rect, 12, "int")
+        rW := rR - rL - 2, rH := rB - rT, rL += 3, rR += 3
+        ; Limit width to visible area when value column is very wide
+        if (rW > client_width)
+            rW := client_width
+        ; Move the edit control into position and show it
+        GuiControl,, % this.hLVEdit
+            , % this.provider.HasChildren(item) ? OBJECT_STRING : item.value
+        GuiControl Move, % this.hLVEdit, x%rL% y%rT% w%rW% h%rH%
+        GuiControl Show, % this.hLVEdit
+        GuiControl Focus, % this.hLVEdit
+        static EM_SETSEL := 0xB1
+        SendMessage EM_SETSEL, 0, -1,, % "ahk_id " this.hLVEdit
+    }
+    CancelEdit() {
+        this.EditRow := ""
+        GuiControl Hide, % this.hLVEdit
+    }
+    SaveEdit() {
+        if !r := this.EditRow
+            throw Exception("Not editing", -1)
+        GuiControlGet value,, % this.hLVEdit
+        node := this.LV_Data(r)
+        if this.provider.HasChildren(node) && value == this.OBJECT_STRING
+            return this.CancelEdit()
+        GuiControl -Redraw, % this.hLV
+        this.EditRow := ""
+        GuiControl Hide, % this.hLVEdit
+        this.RemoveProp(r)
+        node.children := ""     ; Clear any cached children.
+        node.expanded := false  ; Since value is a string, node can't be expanded.
+        this.provider.SetValue(node, value)
+        this.InsertProp(r, node)
+        GuiControl +Redraw, % this.hLV
+    }
+    IsEditing() {
+        return DllCall("IsWindowVisible", "ptr", this.hLVEdit)
+    }
+
+    OnKeyDown(wParam, lParam, msg, hwnd) {
+        if !(this := this.Instances[A_Gui])
+            return
+        key := GetKeyName(vksc := Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
+        if (hwnd = this.hLV) {
+            ctrl := "LV"
+            if !(r := LV_GetNext(0, "F")) {
+                if (key = "Tab") {
+                    LV_Modify(1, "Select Focus")
+                    return true
+                }
+                return
+            }
+            node := this.LV_Data(r)
+        }
+        else if (hwnd = this.hLVEdit) {
+            ctrl := "LVEdit"
+        }
+        if IsFunc(this[ctrl "_" key])
+            return this[ctrl "_" key](r, node)
+    }
+    LVEdit_Enter() {
+        return this.LVEdit_Tab()
+    }
+    LVEdit_Tab() {
+        r := this.EditRow
+        this.SaveEdit()
+        if !(GetKeyState("Shift") || r=LV_GetCount())
+            r += 1
+        LV_Modify(r, "Select Focus")
+        return true
+    }
+    LVEdit_Escape() {
+        this.CancelEdit()
+        return true
+    }
+    LV_Tab(r, node) {
+        if GetKeyState("Shift") {
+            if (r = 1)
+                return
+            LV_Modify(--r, "Select Focus")
+            if !this.provider.HasChildren(this.LV_Data(r))
+                this.BeginEdit(r)
+            return true
+        }
+        return this.LV_Enter(r, node)
+    }
+    LV_Enter(r, node) {
+        if !this.provider.HasChildren(node) {
+            this.BeginEdit(r)
+            return true
+        }
+        if !node.expanded
+            this.ExpandContract(r)
+        LV_Modify(r+1, "Select Focus")
+        return true
+    }
+    LV_Left(r, node) {
+        if node.expanded {
+            this.ExpandContract(r)
+            return true
+        }
+        loop
+            r -= 1
+        until r < 1 || this.LV_Data(r).level < node.level
+        if r
+            LV_Modify(r, "Select Focus")
+        return true
+    }
+    LV_Right(r, node) {
+        if this.provider.HasChildren(node)
+            if node.expanded
+                LV_Modify(r+1, "Select Focus")
+            else
+                this.ExpandContract(r)
+        return true
+    }
+
+    OnWmCommand(wParam, lParam) {
+        if !(this := this.Instances[A_Gui])
+            return
+        static EN_KILLFOCUS := 0x200
+        if (lParam = this.hLVEdit && (wParam >> 16) = EN_KILLFOCUS) {
+            if this.IsEditing()
+                this.SaveEdit()
+            ;else: focus was killed as a result of cancelling.
+        }
+    }
+
+    OnWmNotify(wParam, lParam) {
+        Critical
+        if !(this := this.Instances[A_Gui])
+            return
+        code := NumGet(lParam + A_PtrSize*2, "int")
+        if (code = -180 || code = -181) { ; LVN_BEGINSCROLL || LVN_ENDSCROLL
+            if this.IsEditing()
+                this.SaveEdit()
+            return
+        }
+        if (code = -306 || code = -326) { ; HDN_BEGINTRACK A|W
+            column := NumGet(lParam + A_PtrSize*3, "int") + 1
+            if (column = this.COL_NAME) {
+                LV_ModifyCol(this.COL_VALUE) ; See below.
+                return false
+            }
+            return true ; Prevent tracking.
+        }
+        if (code = -306 || code = -327) { ; HDN_ENDTRACK A|W
+            ; This must be the Name column, since otherwise tracking was prevented.
+            ; Auto-size the Value column so that it fills the available space, but
+            ; don't shrink it smaller than the size set when tracking began above;
+            ; i.e. the size of the widest value.  It was set when tracking began
+            ; to avoid the effect of the scroll bar shrinking when tracking ends.
+            this.AutoSizeValueColumn(this.LV_GetColumnWidth(this.COL_VALUE))
+            return true
+        }
+    }
+    
+    ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
+    LV_GetColumnWidth(column) {
+        static LVM_GETCOLUMNWIDTH := 0x101D
+        SendMessage, LVM_GETCOLUMNWIDTH, column-1, 0,, % "ahk_id " this.hLV
+        return ErrorLevel
+    }
+    LV_SetItemIndent(row, numIcons) {
+        static LVM_SETITEM := A_IsUnicode ? 0x104C : 0x1006 ; LVM_SETITEMW : LVM_SETITEMA
+        static LVITEM_SIZE := 48 + (A_PtrSize * 3)
+        static LVIF_INDENT := 0x00000010
+        static OffIndent := 24 + (A_PtrSize * 3)
+        VarSetCapacity(lvitem, LVITEM_SIZE, 0)
+        NumPut(LVIF_INDENT, lvitem, 0, "UInt")
+        NumPut(row - 1, lvitem, 4, "Int")
+        NumPut(numIcons, lvitem, OffIndent, "Int")
+        SendMessage, LVM_SETITEM, 0, &lvitem, , % "ahk_id " this.hLV
+        return ErrorLevel
+    }
+}
+
+DebugVars_GuiClose(hwnd) {
+    DebugVars.RevokeHwnd(hwnd)
+}
+
+DebugVars_GuiEscape(hwnd) {
+    DebugVars.Instances[hwnd].Hide()
+}
