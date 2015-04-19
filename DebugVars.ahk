@@ -45,7 +45,12 @@ class DebugVars extends DebugVars_Base
         DebugVars.InitClass()
         this.provider := aProvider
         
-        Gui New, hwndhGui LabelDebugVars_Gui
+        last_found := WinExist()
+        Gui +LastFoundExist  ; Limitation: Setting default Gui name without creating Gui won't work.
+        last_gui := WinExist()
+        
+        Gui New, hwndhGui LabelDebugVars_Gui +Resize
+        Gui Margin, 0, 0
         Gui Add, Edit, hwndhLVEdit Hidden
         Gui Add, ListView, xp yp hwndhLV AltSubmit w500 h300
             ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
@@ -56,20 +61,41 @@ class DebugVars extends DebugVars_Base
         this.hLVEdit := hLVEdit
         this.hGui    := hGui
         
-        LV_SetImageList(DebugVars.ImageList)
+        ; Copy the ImageList, otherwise it is destroyed with the first DebugVars GUI.
+        ; LVS_SHAREIMAGELIST would let controls share the ImageList, but it's still
+        ; destroyed when the last ListView is destroyed.
+        LV_SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", DebugVars.ImageList, "ptr"))
         
-        for i, node in aProvider.GetChildren(aProvider.GetRoot()) {
+        this.Populate()
+        
+        LV_ModifyCol(this.COL_NAME, 150)
+        LV_ModifyCol(this.COL_DATA, 0)
+        this.AutoSizeValueColumn()
+        
+        if last_gui
+            Gui %last_gui%: Default
+        else
+            Gui 1: Default  ; Just a guess; better than leaving our Gui as default.
+        if last_found
+            WinExist("ahk_id " last_found)
+    }
+    
+    Populate() {
+        for i, node in this.provider.GetChildren(this.provider.GetRoot()) {
             node.level := 0
             this.InsertProp(A_Index, node)
         }
-        
-        LV_ModifyCol()
-        LV_ModifyCol(this.COL_DATA, 0)
-        this.AutoSizeValueColumn()
+    }
+    
+    Reset() {
+        Gui % this.hGui ":Default"
+        while LV_GetCount()
+            this.RemoveProp(1)
+        this.Populate()
     }
     
     Show() {
-        this.Instances[this.hGui] := this
+        DebugVars.Instances[this.hGui] := this
         Gui % this.hGui ":Show"
     }
     
@@ -164,7 +190,7 @@ class DebugVars extends DebugVars_Base
     }
 
     ExpandContract(r) {
-        if !IsObject((item := this.LV_Data(r)).value)
+        if !this.provider.HasChildren(item := this.LV_Data(r))
             return
         GuiControl -Redraw, % this.hLV
         if item.expanded := !item.expanded
@@ -387,4 +413,9 @@ DebugVars_GuiClose(hwnd) {
 
 DebugVars_GuiEscape(hwnd) {
     DebugVars.Instances[hwnd].Hide()
+}
+
+DebugVars_GuiSize(hwnd, e, w, h) {
+    GuiControl Move, SysListView321, w%w% h%h%
+    DebugVars.Instances[hwnd].AutoSizeValueColumn()
 }
