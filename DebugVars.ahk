@@ -1,61 +1,8 @@
-﻿/*
-TODO:
-  show a separate dialog for editing really large (or multi-line) values
-  consider how to display `n and other such characters
-
-*/
-
-#Warn,, StdOut
-global A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
-
-dv := new DebugVars(TestVarProvider)
-dv.Show(), dv := ""
-while DebugVars.Instances.MaxIndex()
-    Sleep 1000
-ExitApp
-
-class ThrowMissingMethod {
+﻿
+class DebugVars_Base
+{
     __Call(name) {
         throw Exception("Unknown method", -1, name)
-    }
-}
-
-class TestVarProvider extends ThrowMissingMethod
-{
-    GetRoot() {
-        if this.root
-            return this.root
-        test_names =
-        (LTrim
-            A_ScriptDir
-            A_ScriptName
-            A_ScriptFullPath
-            A_ScriptHwnd
-            A_Args
-        )
-        value := {}
-        Loop Parse, test_names, `n
-            value[A_LoopField] := %A_LoopField%
-        return this.root := {value: value}
-    }
-    
-    GetChildren(node) {
-        if !nodes := node.children {
-            nodes := node.children := []
-            for k,v in node.value
-                nodes.Push({name: k, value: v, parent: node})
-        }
-        return nodes
-    }
-    
-    HasChildren(node) {
-        return IsObject(node.value)
-    }
-    
-    SetValue(node, value) {
-        if node.parent
-            node.parent.value[node.name] := value
-        node.value := value
     }
 }
 
@@ -67,7 +14,7 @@ class TestVarProvider extends ThrowMissingMethod
         dv.Show()
         dv.Hide()
 */
-class DebugVars extends ThrowMissingMethod
+class DebugVars extends DebugVars_Base
 {
     static COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
     static OBJECT_STRING := "(object)"
