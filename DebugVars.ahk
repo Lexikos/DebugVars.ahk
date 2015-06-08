@@ -155,7 +155,7 @@ class DebugVars extends DebugVars_Base
     }
     
     OnLButtonDown(wParam, lParam, msg, hwnd) {
-        if !(this := this.Instances[A_Gui])
+        if !(this := this.Instances[A_Gui+0])
             return
         if (hwnd != this.hLV)
             return
@@ -165,7 +165,7 @@ class DebugVars extends DebugVars_Base
         VarSetCapacity(hti, 24, 0)
         NumPut(lParam & 0xFFFF, hti, 0, "short")
         NumPut(lParam >> 16, hti, 4, "short")
-        SendMessage LVM_SUBITEMHITTEST, 0, &hti,, % "ahk_id " this.hLV
+        SendMessage % LVM_SUBITEMHITTEST, 0, % &hti,, % "ahk_id " this.hLV
         where := NumGet(hti, 8, "int")
         r := NumGet(hti, 12, "int") + 1
         if (!r)
@@ -209,7 +209,7 @@ class DebugVars extends DebugVars_Base
         VarSetCapacity(rect, 16, 0)
         NumPut(LVIR_LABEL, rect, 0, "int")
         NumPut(this.COL_VALUE-1, rect, 4, "int")
-        SendMessage LVM_GETSUBITEMRECT, r-1, &rect,, % "ahk_id " this.hLV
+        SendMessage % LVM_GETSUBITEMRECT, % r-1, % &rect,, % "ahk_id " this.hLV
         if !ErrorLevel
             return
         ; Scroll whole field into view if needed
@@ -222,7 +222,7 @@ class DebugVars extends DebugVars_Base
             if (delta > rL)
                 delta := rL
             static LVM_SCROLL := 0x1014
-            SendMessage LVM_SCROLL, delta, 0,, % "ahk_id " this.hLV
+            SendMessage % LVM_SCROLL, % delta, 0,, % "ahk_id " this.hLV
             NumPut(rL - delta, rect, 0, "int")
             NumPut(rR - delta, rect, 8, "int")
             Sleep 100
@@ -242,7 +242,7 @@ class DebugVars extends DebugVars_Base
         GuiControl Show, % this.hLVEdit
         GuiControl Focus, % this.hLVEdit
         static EM_SETSEL := 0xB1
-        SendMessage EM_SETSEL, 0, -1,, % "ahk_id " this.hLVEdit
+        SendMessage % EM_SETSEL, 0, -1,, % "ahk_id " this.hLVEdit
     }
     CancelEdit() {
         this.EditRow := ""
@@ -270,7 +270,7 @@ class DebugVars extends DebugVars_Base
     }
 
     OnKeyDown(wParam, lParam, msg, hwnd) {
-        if !(this := this.Instances[A_Gui])
+        if !(this := this.Instances[A_Gui+0])
             return
         key := GetKeyName(vksc := Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
         if (hwnd = this.hLV) {
@@ -348,7 +348,7 @@ class DebugVars extends DebugVars_Base
     }
 
     OnWmCommand(wParam, lParam) {
-        if !(this := this.Instances[A_Gui])
+        if !(this := this.Instances[A_Gui+0])
             return
         static EN_KILLFOCUS := 0x200
         if (lParam = this.hLVEdit && (wParam >> 16) = EN_KILLFOCUS) {
@@ -360,7 +360,7 @@ class DebugVars extends DebugVars_Base
 
     OnWmNotify(wParam, lParam) {
         Critical
-        if !(this := this.Instances[A_Gui])
+        if !(this := this.Instances[A_Gui+0])
             return
         code := NumGet(lParam + A_PtrSize*2, "int")
         if (code = -180 || code = -181) { ; LVN_BEGINSCROLL || LVN_ENDSCROLL
@@ -390,7 +390,7 @@ class DebugVars extends DebugVars_Base
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
     LV_GetColumnWidth(column) {
         static LVM_GETCOLUMNWIDTH := 0x101D
-        SendMessage, LVM_GETCOLUMNWIDTH, column-1, 0,, % "ahk_id " this.hLV
+        SendMessage % LVM_GETCOLUMNWIDTH, % column-1, 0,, % "ahk_id " this.hLV
         return ErrorLevel
     }
     LV_SetItemIndent(row, numIcons) {
@@ -402,7 +402,7 @@ class DebugVars extends DebugVars_Base
         NumPut(LVIF_INDENT, lvitem, 0, "UInt")
         NumPut(row - 1, lvitem, 4, "Int")
         NumPut(numIcons, lvitem, OffIndent, "Int")
-        SendMessage, LVM_SETITEM, 0, &lvitem, , % "ahk_id " this.hLV
+        SendMessage % LVM_SETITEM, 0, % &lvitem, , % "ahk_id " this.hLV
         return ErrorLevel
     }
 }

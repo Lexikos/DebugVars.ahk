@@ -33,7 +33,7 @@ class GlobalVarProvider extends ObjectVarProvider
 {
     __new(var_names) {
         value := {}
-        Loop Parse, var_names, `n
+        Loop Parse, % var_names, `n
             value[A_LoopField] := %A_LoopField%
         base.__new(value)
     }

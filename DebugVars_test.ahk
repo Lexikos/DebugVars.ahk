@@ -17,7 +17,7 @@ dv := new DebugVars(new GlobalVarProvider("
         A_Args
     )"))
 dv.Show(), dv := ""
-while DebugVars.Instances.MaxIndex()
+while DebugVars.Instances.Length()
     Sleep 1000
 ExitApp
 
