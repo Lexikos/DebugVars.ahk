@@ -260,11 +260,13 @@ class DebugVars extends DebugVars_Base
         GuiControl -Redraw, % this.hLV
         this.EditRow := ""
         GuiControl Hide, % this.hLVEdit
-        this.RemoveProp(r)
-        node.children := ""     ; Clear any cached children.
-        node.expanded := false  ; Since value is a string, node can't be expanded.
-        this.provider.SetValue(node, value)
-        this.InsertProp(r, node)
+        if this.provider.SetValue(node, value) != 0
+        {
+            this.RemoveProp(r)
+            node.children := ""     ; Clear any cached children.
+            node.expanded := false  ; Since value is a string, node can't be expanded.
+            this.InsertProp(r, node)
+        }
         GuiControl +Redraw, % this.hLV
     }
     IsEditing() {
