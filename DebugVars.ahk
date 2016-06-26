@@ -29,9 +29,9 @@ class DebugVars extends DebugVars_Base
         il := DllCall("comctl32.dll\ImageList_Create"
             , "int", this.ICON_SIZE, "int", this.ICON_SIZE
             , "uint", 0x21, "int", 2, "int", 5, "ptr")
-        IL_Add(il, "empty.png")
-        IL_Add(il, "plus.png")
-        IL_Add(il, "minus.png")
+        IL_Add(il, A_LineFile "\..\empty.png")
+        IL_Add(il, A_LineFile "\..\plus.png")
+        IL_Add(il, A_LineFile "\..\minus.png")
         this.ImageList := il
         
         OnMessage(0x100, this.OnKeyDown.Bind(this))
