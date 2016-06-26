@@ -124,7 +124,7 @@ class DebugVars extends DebugVars_Base
     InsertProp(r, item) {
         has_children := this.provider.HasChildren(item)
         opt := has_children ? "Icon" (item.expanded ? 3 : 2) : ""
-        valueText := has_children ? this.OBJECT_STRING : item.value
+        valueText := this.provider.GetValueString(item)
         ObjAddRef(&item)
         LV_Insert(r, opt, item.name, valueText, &item)
         if item.level
@@ -236,8 +236,10 @@ class DebugVars extends DebugVars_Base
         if (rW > client_width)
             rW := client_width
         ; Move the edit control into position and show it
-        GuiControl,, % this.hLVEdit
-            , % this.provider.HasChildren(item) ? OBJECT_STRING : item.value
+        this.EditText := this.provider.HasChildren(item)
+            ? (LV_GetText(value, r, this.COL_VALUE) ? value : "")
+            : item.value
+        GuiControl,, % this.hLVEdit, % this.EditText
         GuiControl Move, % this.hLVEdit, x%rL% y%rT% w%rW% h%rH%
         GuiControl Show, % this.hLVEdit
         GuiControl Focus, % this.hLVEdit
@@ -253,7 +255,7 @@ class DebugVars extends DebugVars_Base
             throw Exception("Not editing", -1)
         GuiControlGet value,, % this.hLVEdit
         node := this.LV_Data(r)
-        if this.provider.HasChildren(node) && value == this.OBJECT_STRING
+        if this.EditText == value  ; Avoid erasing objects.
             return this.CancelEdit()
         GuiControl -Redraw, % this.hLV
         this.EditRow := ""
