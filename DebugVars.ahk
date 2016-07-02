@@ -203,6 +203,9 @@ class DebugVars extends DebugVars_Base
             this.RemoveChildren(r+1, item)
         LV_Modify(r, "Select Focus Icon" (2+item.expanded))
         GuiControl +Redraw, % this.hLV
+        ; Adjust value column in case a vertical scrollbar was just added/removed.
+        ; This only works after redraw.
+        this.AutoSizeValueColumn()
     }
 
     BeginEdit(r) {
