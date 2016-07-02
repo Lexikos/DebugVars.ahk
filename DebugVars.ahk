@@ -181,6 +181,10 @@ class DebugVars extends DebugVars_Base
             this.BeginEdit(r)
             return true
         }
+        if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.OnDoubleClick) {
+            if node := this.LV_Data(r)
+                this.OnDoubleClick(node)
+        }
     }
 
     LV_Data(r) {
@@ -391,6 +395,13 @@ class DebugVars extends DebugVars_Base
         }
     }
     
+    ContextMenu(ctrlHwnd, eventInfo, isRightClick, x, y) {
+        if (ctrlHwnd != this.hLV || !this.OnContextMenu)
+            return
+        node := eventInfo ? this.LV_Data(eventInfo) : ""
+        this.OnContextMenu(node, isRightClick, x, y)
+    }
+    
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
     LV_GetColumnWidth(column) {
         static LVM_GETCOLUMNWIDTH := 0x101D
@@ -422,4 +433,8 @@ DebugVars_GuiEscape(hwnd) {
 DebugVars_GuiSize(hwnd, e, w, h) {
     GuiControl Move, SysListView321, w%w% h%h%
     DebugVars.Instances[hwnd].AutoSizeValueColumn()
+}
+
+DebugVars_GuiContextMenu(hwnd, prms*) {
+    DebugVars.Instances[hwnd].ContextMenu(prms*)
 }
