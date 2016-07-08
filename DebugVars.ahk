@@ -94,9 +94,9 @@ class DebugVars extends DebugVars_Base
         this.Populate()
     }
     
-    Show() {
+    Show(options:="", title:="") {
         DebugVars.Instances[this.hGui] := this
-        Gui % this.hGui ":Show"
+        Gui % this.hGui ":Show", % options, % title
     }
     
     Hide() {
