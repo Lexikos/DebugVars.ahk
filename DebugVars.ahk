@@ -16,6 +16,8 @@ class DebugVars_Base
         dv.Reset()
         dv.EnableRedraw(enable)
         dv.OnContextMenu := Func(dv, node, isRightClick, x, y)
+        dv.ScrollPos
+        dv.FocusedItem
 */
 class DebugVars extends DebugVars_Base
 {
@@ -43,14 +45,12 @@ class DebugVars extends DebugVars_Base
         OnMessage(0x203, lbd) ; DBLCLK
         OnMessage(0x4E, this.OnWmNotify.Bind(this))
     }
-
+    
     __New(aProvider) {
         DebugVars.InitClass()
         this.provider := aProvider
         
-        last_found := WinExist()
-        Gui +LastFoundExist  ; Limitation: Setting default Gui name without creating Gui won't work.
-        last_gui := WinExist()
+        restore_gui_on_return := new this.GuiScope()
         
         Gui New, hwndhGui LabelDebugVars_Gui +Resize
         Gui Margin, 0, 0
@@ -74,13 +74,6 @@ class DebugVars extends DebugVars_Base
         LV_ModifyCol(this.COL_NAME, 150)
         LV_ModifyCol(this.COL_DATA, 0)
         this.AutoSizeValueColumn()
-        
-        if last_gui
-            Gui %last_gui%: Default
-        else
-            Gui 1: Default  ; Just a guess; better than leaving our Gui as default.
-        if last_found
-            WinExist("ahk_id " last_found)
     }
     
     Populate() {
@@ -195,6 +188,13 @@ class DebugVars extends DebugVars_Base
         if LV_GetText(data, r, this.COL_DATA)
             return Object(data)
         throw Exception("Bad row", -1, r)
+    }
+    LV_FindData(obj) {
+        Loop % LV_GetCount() {
+            LV_GetText(data, A_Index, this.COL_DATA)
+            if (data == &obj)
+                return A_Index
+        }
     }
 
     ExpandContract(r) {
@@ -430,6 +430,55 @@ class DebugVars extends DebugVars_Base
         NumPut(numIcons, lvitem, OffIndent, "Int")
         SendMessage % LVM_SETITEM, 0, % &lvitem, , % "ahk_id " this.hLV
         return ErrorLevel
+    }
+    
+    class GuiScope {
+        __New(new_default) {
+            this.last_found := WinExist()
+            Gui +LastFoundExist  ; Limitation: Setting default Gui name without creating Gui won't work.
+            this.last_gui := WinExist()
+        }
+        __Delete() {
+            if last_gui := this.last_gui
+                Gui %last_gui%: Default
+            else
+                Gui 1: Default  ; Just a guess; better than leaving our Gui as default.
+            if last_found := this.last_found
+                WinExist("ahk_id " last_found)
+        }
+    }
+    
+    ScrollPos {
+        get {
+            return DllCall("GetScrollPos", "ptr", this.hLV, "int", 1)
+        }
+        set {
+            static LVM_GETITEMPOSITION := 0x1010, LVM_SCROLL := 0x1014
+            VarSetCapacity(pt, 8, 0)
+            SendMessage % LVM_GETITEMPOSITION, % this.ScrollPos, % &pt,, % "ahk_id " this.hLV
+            oldPixelY := NumGet(pt, 4, "int")
+            SendMessage % LVM_GETITEMPOSITION, % value, % &pt,, % "ahk_id " this.hLV
+            newPixelY := NumGet(pt, 4, "int")
+            if (ErrorLevel = 1)
+                SendMessage % LVM_SCROLL, 0, % newPixelY - oldPixelY,, % "ahk_id " this.hLV
+            return value
+        }
+    }
+    
+    FocusedItem {
+        get {
+            restore_gui_on_return := new this.GuiScope()
+            Gui % this.hGui ":Default"
+            return (r := LV_GetNext(,"F")) ? this.LV_Data(r) : ""
+        }
+        set {
+            restore_gui_on_return := new this.GuiScope()
+            Gui % this.hGui ":Default"
+            if !(r := this.LV_FindData(value))
+                return ""
+            LV_Modify(r, "Focus Select")
+            return value
+        }
     }
 }
 
