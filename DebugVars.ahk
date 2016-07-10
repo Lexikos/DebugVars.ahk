@@ -13,6 +13,9 @@ class DebugVars_Base
         dv := new DebugVars(Provider)
         dv.Show()
         dv.Hide()
+        dv.Reset()
+        dv.EnableRedraw(enable)
+        dv.OnContextMenu := Func(dv, node, isRightClick, x, y)
 */
 class DebugVars extends DebugVars_Base
 {
@@ -403,6 +406,10 @@ class DebugVars extends DebugVars_Base
             return
         node := eventInfo ? this.LV_Data(eventInfo) : ""
         this.OnContextMenu(node, isRightClick, x, y)
+    }
+    
+    EnableRedraw(enable) {
+        GuiControl % (enable ? "+" : "-") "Redraw", % this.hLV
     }
     
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
