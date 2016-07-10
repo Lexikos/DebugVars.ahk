@@ -84,9 +84,10 @@ class DebugVars extends DebugVars_Base
     }
     
     Populate() {
+        r := 1
         for i, node in this.provider.GetChildren(this.provider.GetRoot()) {
             node.level := 0
-            this.InsertProp(A_Index, node)
+            r := this.InsertProp(r, node)
         }
     }
     
@@ -132,8 +133,10 @@ class DebugVars extends DebugVars_Base
         LV_Insert(r, opt, item.name, valueText, &item)
         if item.level
             this.LV_SetItemIndent(r, item.level)
+        ++r
         if item.expanded
-            this.InsertChildren(r+1, item)
+            r := this.InsertChildren(r, item)
+        return r ; The row after the inserted items.
     }
     RemoveProp(r) {
         ObjRelease(&(item := this.LV_Data(r)))
@@ -146,11 +149,9 @@ class DebugVars extends DebugVars_Base
         level := item.level + 1
         for _, child in this.provider.GetChildren(item) {
             child.level := level
-            this.InsertProp(r, child)
-            r += 1
-            if child.expanded
-                r += child.children.Length()
+            r := this.InsertProp(r, child)
         }
+        return r
     }
     RemoveChildren(r, item) {
         Loop % item.children.Length()
