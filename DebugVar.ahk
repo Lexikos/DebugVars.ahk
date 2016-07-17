@@ -54,6 +54,7 @@ class DebugVar {
         
         GuiControl,, % InStr(value,"`r`n") ? this.hCRLF : this.hLF, 1
         this.DisEnableEOLControls(value, readonly)
+        this.CheckWantReturn(type)
         
         this.UpdateTitle()
     }
@@ -174,6 +175,7 @@ class DebugVar {
         GuiControlGet type,, % this.hType
         this.preferredType := type
         GuiControlGet value,, % this.hEdit
+        this.CheckWantReturn(type)
         if !this.Dirty
             this.BeginEdit()
     }
@@ -195,8 +197,9 @@ class DebugVar {
             GuiControl,, % this.hType, %types%
             GuiControl Choose, % this.hType, % this.preferredType
         }
-        GuiControlGet type,, % this.hType
         this.DisEnableEOLControls(value, false)
+        GuiControlGet type,, % this.hType
+        this.CheckWantReturn(type)
         if !this.Dirty
             this.BeginEdit()
     }
@@ -205,6 +208,14 @@ class DebugVar {
         disen := (!readonly && InStr(value,"`n")) ? "Enable" : "Disable"
         GuiControl % disen, % this.hLF
         GuiControl % disen, % this.hCRLF
+    }
+    
+    CheckWantReturn(type) {
+        ; For convenience, make Enter activate the Save button if user
+        ; is unlikely to want to insert a newline (i.e. type is numeric).
+        WantReturn := !(type = "integer" || type = "float")
+        GuiControl % (WantReturn ? "+" : "-") "WantReturn", % this.hEdit
+        GuiControl % (Wantreturn ? "-" : "+") "Default", % this.hSaveBtn
     }
 }
 
