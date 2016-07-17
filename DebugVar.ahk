@@ -1,0 +1,242 @@
+﻿
+/*
+    DebugVars
+    
+    Public interface:
+        dv := new DebugVar({Name, Value, Type})
+        dv.SetVar({Name, Value, Type})
+        dv.Show()
+        dv.Cancel()
+        dv.Hide()
+        dv.OnSave := Func(dv, value, type)
+        dv.OnDirty := Func(dv)
+        dv.OnCancel := Func(dv)
+*/
+class DebugVar {
+    __New(aVar:="") {
+        editOpt := ""
+        if aVar && (aVar.type = "integer" || aVar.type = "float")
+            editOpt := "r1 Multi" ; Default to one line.
+        this.CreateGui(editOpt)
+        if aVar
+            this.SetVar(aVar)
+    }
+    
+    SetVar(aVar) {
+        this.Dirty := false
+        this.Var := aVar
+        GuiControl Disable, % this.hSaveBtn
+        
+        type := aVar.type
+        value := aVar.value
+        readonly := aVar.readonly
+        
+        if readonly
+            types := "|" type
+        else {
+            ; 'undefined' can't be set by the user, but may be the initial type
+            types := (type = "undefined" ? "|undefined" : "") "|string"
+            if DebugVar_isInt64(value)
+                types .= "|integer" (InStr(value,"0x") ? "" : "|float")
+            else if DebugVar_isFloat(value)
+                types .= "|float"
+        }
+        GuiControl,, % this.hType, % types
+        GuiControl Choose, % this.hType, % type
+        this.preferredType := type
+        
+        GuiControl % (readonly ? "+" : "-") "ReadOnly", % this.hEdit
+        
+        OnMessage(0x111, Func("DebugVar_Suppress"), 1)
+        GuiControl,, % this.hEdit, % value
+        Sleep -1
+        OnMessage(0x111, Func("DebugVar_Suppress"), 0)
+        
+        GuiControl,, % InStr(value,"`r`n") ? this.hCRLF : this.hLF, 1
+        this.DisEnableEOLControls(value, readonly)
+        
+        this.UpdateTitle()
+    }
+    
+    CreateGui(editOpt:="") {
+        Gui New, hwndhGui LabelDebugVar_Gui +Resize
+        
+        Gui Add, Edit, hwndhEdit w300 r10 %editOpt%
+        fn := this.ChangeValue.Bind(this)
+        GuiControl +g, % hEdit, % fn
+        
+        GuiControlGet c, Pos, % hEdit
+        this.marginX := cX, this.marginY := cY
+        
+        Gui Add, DDL, w70 hwndhType, undefined||
+        fn := this.ChangeType.Bind(this)
+        GuiControl +g, % hType, % fn
+        
+        GuiControlGet c, Pos, % this.hType
+        this.footerH := cH
+        
+        Gui Add, Radio, x+m h%cH% hwndhLF, LF
+        Gui Add, Radio, x+0 h%cH% hwndhCRLF, CR+LF
+        fn := this.ChangeEOL.Bind(this)
+        GuiControl +g, % hLF, % fn
+        GuiControl +g, % hCRLF, % fn
+        
+        Gui Add, Button, x+m Disabled hwndhSaveBtn, &Save
+        fn := this.SaveEdit.Bind(this)
+        GuiControl +g, % hSaveBtn, % fn
+        
+        GuiControlGet c, Pos, % hSaveBtn
+        cX += cW + this.marginX
+        Gui +MinSize%cX%x
+        
+        this.hGui := hGui
+        this.hEdit := hEdit
+        this.hType := hType
+        this.hLF := hLF
+        this.hCRLF := hCRLF
+        this.hSaveBtn := hSaveBtn
+    }
+    
+    Show(options:="") {
+        DebugVar.Instances[this.hGui] := this
+        Gui % this.hGui ":Show", % options
+    }
+    
+    Cancel() {
+        if this.Dirty
+            this.CancelEdit()
+        else
+            this.Hide()
+    }
+    
+    Hide() {
+        Gui % this.hGui ":Hide"
+        DebugVar.RevokeHwnd(this.hGui)
+    }
+    
+    RevokeHwnd(hwnd) {
+        this.Instances.Delete(hwnd)
+    }
+    
+    __Delete() {
+        Gui % this.hGui ":Destroy"
+    }
+    
+    GuiSize(w, h) {
+        cW := w - this.marginX*2
+        cH := h - this.marginY*3 - this.footerH
+        GuiControl Move, % this.hEdit, w%cW% h%cH%
+        y := cH + this.marginY*2
+        GuiControl Move, % this.hType, y%y%
+        Loop 4
+            GuiControl Move, Button%A_Index%, y%y%
+        GuiControlGet c, Pos, % this.hSaveBtn
+        cX := w - this.marginX - cW
+        GuiControl Move, % this.hSaveBtn, x%cX% y%y%
+    }
+    
+    UpdateTitle() {
+        ; Avoiding Gui Show so GuiSize won't be called before Gui is shown,
+        ; and WinSetTitle in case of DetectHiddenWindows Off.
+        DllCall("SetWindowText", "ptr", this.hGui, "str"
+            , "Inspector - " this.Var.name (this.Dirty ? " (modified)" : ""))
+    }
+    
+    BeginEdit() {
+        if !this.OnDirty() {
+            this.Dirty := true
+            GuiControl Enable, % this.hSaveBtn
+            this.UpdateTitle()
+        }
+    }
+    
+    CancelEdit() {
+        if !this.OnCancel()
+            this.SetVar(this.Var)
+    }
+    
+    SaveEdit() {
+        GuiControlGet value,, % this.hEdit
+        GuiControlGet type,, % this.hType
+        GuiControlGet crlf,, % this.hCRLF
+        if crlf
+            value := StrReplace(value, "`n", "`r`n")
+        if !this.OnSave(value, type)
+            this.SetVar(this.Var)
+    }
+    
+    ChangeEOL() {
+        if !this.Dirty
+            this.BeginEdit()
+    }
+    
+    ChangeType() {
+        GuiControlGet type,, % this.hType
+        this.preferredType := type
+        GuiControlGet value,, % this.hEdit
+        if !this.Dirty
+            this.BeginEdit()
+    }
+    
+    ChangeValue() {
+        GuiControlGet value,, % this.hEdit
+        if (value = "" || !DebugVar_isFloat(value) && !DebugVar_isInt64(value)) {
+            ; Only 'string' is valid for this value
+            GuiControl,, % this.hType, |string||
+        }
+        else {
+            types := "|string"
+            if InStr(value, "0x")
+                types .= "|integer||"
+            else if InStr(value, ".")
+                types .= "|float||"
+            else
+                types .= "|integer||float"
+            GuiControl,, % this.hType, %types%
+            GuiControl Choose, % this.hType, % this.preferredType
+        }
+        GuiControlGet type,, % this.hType
+        this.DisEnableEOLControls(value, false)
+        if !this.Dirty
+            this.BeginEdit()
+    }
+    
+    DisEnableEOLControls(value, readonly) {
+        disen := (!readonly && InStr(value,"`n")) ? "Enable" : "Disable"
+        GuiControl % disen, % this.hLF
+        GuiControl % disen, % this.hCRLF
+    }
+}
+
+DebugVar_isInt64(s) {
+    ; Unlike (s+0 != ""), this detects overflow and rules out floating-point.
+    NumPut(0, DllCall("msvcrt\_errno", "ptr"), "int")
+	if A_IsUnicode
+		DllCall("msvcrt\_wcstoi64", "ptr", &s, "ptr*", endp:=0, "int", 0)
+	else
+		DllCall("msvcrt\_strtoi64", "ptr", &s, "ptr*", endp:=0, "int", 0)
+	return DllCall("msvcrt\_errno", "int*") != 34 ; ERANGE
+		&& StrGet(endp) = "" && s != ""
+}
+
+DebugVar_isFloat(s) {
+    if s is float
+        return s
+    return false
+}
+
+DebugVar_GuiClose(hwnd) {
+    DebugVar.RevokeHwnd(hwnd)
+}
+
+DebugVar_GuiEscape(hwnd) {
+    DebugVar.Instances[hwnd].Cancel()
+}
+
+DebugVar_GuiSize(hwnd, e, w, h) {
+    DebugVar.Instances[hwnd].GuiSize(w, h)
+}
+
+DebugVar_Suppress() {
+    return 0
+}

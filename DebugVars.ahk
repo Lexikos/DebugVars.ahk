@@ -22,7 +22,6 @@ class DebugVars_Base
 class DebugVars extends DebugVars_Base
 {
     static COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
-    static OBJECT_STRING := "(object)"
     
     static Instances  ; Hwnd:Object map of visible instances.
     

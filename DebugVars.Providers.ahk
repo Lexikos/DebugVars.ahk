@@ -13,7 +13,7 @@ class ObjectVarProvider extends DebugVars_Base
         if !nodes := node.children {
             nodes := node.children := []
             for k,v in node.value
-                nodes.Push({name: k, value: v, parent: node})
+                nodes.Push({name: k, value: v, container: node.value})
         }
         return nodes
     }
@@ -24,17 +24,17 @@ class ObjectVarProvider extends DebugVars_Base
     
     GetValueString(node) {
         if IsObject(node.value) {
-            try return node.value.ToString()
+            try if node.value.ToString
+                return node.value.ToString()
             try if className := node.value.__Class
-                return className " object"
-            return DebugVars.OBJECT_STRING
+                return className
+            return "Object"
         }
         return node.value
     }
     
     SetValue(node, value) {
-        if node.parent
-            node.parent.value[node.name] := value
+        node.container[node.name] := value
         node.value := value
     }
 }
