@@ -10,7 +10,7 @@ class DebugVars_Base
     DebugVars
     
     Public interface:
-        dv := new DebugVars(Provider)
+        dv := new DebugVars(RootNode)
         dv.Show()
         dv.Hide()
         dv.Reset()
@@ -45,9 +45,9 @@ class DebugVars extends DebugVars_Base
         OnMessage(0x4E, this.OnWmNotify.Bind(this))
     }
     
-    __New(aProvider) {
+    __New(RootNode) {
         DebugVars.InitClass()
-        this.provider := aProvider
+        this.root := RootNode
         
         restore_gui_on_return := new this.GuiScope()
         
@@ -77,7 +77,7 @@ class DebugVars extends DebugVars_Base
     
     Populate() {
         r := 1
-        for i, node in this.provider.GetChildren(this.provider.GetRoot()) {
+        for i, node in this.root.GetChildren() {
             node.level := 0
             r := this.InsertProp(r, node)
         }
@@ -118,9 +118,9 @@ class DebugVars extends DebugVars_Base
     }
 
     InsertProp(r, item) {
-        has_children := this.provider.HasChildren(item)
+        has_children := item.HasChildren()
         opt := has_children ? "Icon" (item.expanded ? 3 : 2) : ""
-        valueText := this.provider.GetValueString(item)
+        valueText := item.GetValueString()
         ObjAddRef(&item)
         LV_Insert(r, opt, item.name, valueText, &item)
         if item.level
@@ -139,7 +139,7 @@ class DebugVars extends DebugVars_Base
     }
     InsertChildren(r, item) {
         level := item.level + 1
-        for _, child in this.provider.GetChildren(item) {
+        for _, child in item.GetChildren() {
             child.level := level
             r := this.InsertProp(r, child)
         }
@@ -197,7 +197,8 @@ class DebugVars extends DebugVars_Base
     }
 
     ExpandContract(r) {
-        if !this.provider.HasChildren(item := this.LV_Data(r))
+        item := this.LV_Data(r)
+        if !item.HasChildren()
             return
         GuiControl -Redraw, % this.hLV
         if item.expanded := !item.expanded
@@ -246,7 +247,7 @@ class DebugVars extends DebugVars_Base
         if (rW > client_width)
             rW := client_width
         ; Move the edit control into position and show it
-        this.EditText := this.provider.HasChildren(item)
+        this.EditText := item.HasChildren()
             ? (LV_GetText(value, r, this.COL_VALUE) ? value : "")
             : item.value
         GuiControl,, % this.hLVEdit, % this.EditText
@@ -270,7 +271,7 @@ class DebugVars extends DebugVars_Base
         GuiControl -Redraw, % this.hLV
         this.EditRow := ""
         GuiControl Hide, % this.hLVEdit
-        if this.provider.SetValue(node, value) != 0
+        if node.SetValue(value) != 0
         {
             this.RemoveProp(r)
             node.children := ""     ; Clear any cached children.
@@ -324,14 +325,14 @@ class DebugVars extends DebugVars_Base
             if (r = 1)
                 return
             LV_Modify(--r, "Select Focus")
-            if !this.provider.HasChildren(this.LV_Data(r))
+            if !this.LV_Data(r).HasChildren()
                 this.BeginEdit(r)
             return true
         }
         return this.LV_Enter(r, node)
     }
     LV_Enter(r, node) {
-        if !this.provider.HasChildren(node) {
+        if !node.HasChildren() {
             this.BeginEdit(r)
             return true
         }
@@ -353,7 +354,7 @@ class DebugVars extends DebugVars_Base
         return true
     }
     LV_Right(r, node) {
-        if this.provider.HasChildren(node)
+        if node.HasChildren()
             if node.expanded
                 LV_Modify(r+1, "Select Focus")
             else

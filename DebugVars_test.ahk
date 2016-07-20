@@ -8,14 +8,18 @@ TODO:
 #Warn,, StdOut
 global A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
 
-dv := new DebugVars(new GlobalVarProvider("
+test_vars := "
     (LTrim
         A_ScriptDir
         A_ScriptName
         A_ScriptFullPath
         A_ScriptHwnd
         A_Args
-    )"))
+    )"
+test_obj := {}
+Loop Parse, % test_vars, `n
+    test_obj[A_LoopField] := %A_LoopField%
+dv := new DebugVars(new DvObjectNode(test_obj))
 dv.OnContextMenu := Func("DV_ContextMenu")
 dv.OnDoubleClick := Func("DV_EditNode")
 dv.Show(), dv := ""
@@ -41,7 +45,7 @@ ED_Save(dv, node, ed, value, type) {
         value += 0
     else if (type = "float")
         value += 0.0
-    dv.provider.SetValue(node, value)
+    node.SetValue(value)
     dv.Reset()
     ed.Var.value := value
     ed.Var.type := type
@@ -55,5 +59,5 @@ dv_type(v) {
 }
 
 #Include DebugVars.ahk
-#Include DebugVars.Providers.ahk
+#Include DebugVars.ObjectNode.ahk
 #Include DebugVar.ahk
