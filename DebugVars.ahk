@@ -266,7 +266,7 @@ class DebugVars extends DebugVars_Base
             throw Exception("Not editing", -1)
         GuiControlGet value,, % this.hLVEdit
         node := this.LV_Data(r)
-        if this.EditText == value  ; Avoid erasing objects.
+        if this.EditText == "" value  ; Avoid erasing objects.
             return this.CancelEdit()
         GuiControl -Redraw, % this.hLV
         this.EditRow := ""
