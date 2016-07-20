@@ -5,16 +5,21 @@ class DvObjectNode extends DebugVars_Base
         this.value := value
     }
     
-    GetChildren() {
-        if !nodes := this.children {
-            nodes := this.children := []
-            for k,v in this.value {
-                child := new DvObjectNode(v)
-                child.key := k
-                child.name := IsObject(k) ? "Object(" (&k) ")" : k
-                child.container := this.value
-                nodes.Push(child)
-            }
+    children {
+        get {
+            ; Store the value so 'get' won't be called again:
+            return this.children := this._MakeChildren()
+        }
+    }
+    
+    _MakeChildren() {
+        nodes := []
+        for k,v in this.value {
+            child := new DvObjectNode(v)
+            child.key := k
+            child.name := IsObject(k) ? "Object(" (&k) ")" : k
+            child.container := this.value
+            nodes.Push(child)
         }
         return nodes
     }

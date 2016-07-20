@@ -77,7 +77,7 @@ class DebugVars extends DebugVars_Base
     
     Populate() {
         r := 1
-        for i, node in this.root.GetChildren() {
+        for i, node in this.root.children {
             node.level := 0
             r := this.InsertProp(r, node)
         }
@@ -139,7 +139,7 @@ class DebugVars extends DebugVars_Base
     }
     InsertChildren(r, item) {
         level := item.level + 1
-        for _, child in item.GetChildren() {
+        for _, child in item.children {
             child.level := level
             r := this.InsertProp(r, child)
         }
