@@ -28,10 +28,10 @@ while DebugVars.Instances.Length()
 ExitApp
 
 DV_ContextMenu(dv, node, isRightClick, x, y) {
-	fn := Func("DV_EditNode").Bind(dv, node)
-	Menu OEmenu, Add, Inspect, % fn
-	Menu OEmenu, Show, % x, % y
-	Menu OEmenu, Delete
+    fn := Func("DV_EditNode").Bind(dv, node)
+    Menu OEmenu, Add, Inspect, % fn
+    Menu OEmenu, Show, % x, % y
+    Menu OEmenu, Delete
 }
 
 DV_EditNode(dv, node) {
@@ -40,7 +40,7 @@ DV_EditNode(dv, node) {
         dv.Show()
         return
     }
-	ed := new DebugVar({name: node.name, value: node.value, type: dv_type(node.value)})
+    ed := new DebugVar({name: node.name, value: node.value, type: dv_type(node.value)})
     ed.OnSave := Func("ED_Save").Bind(dv, node)
     ed.Show()
 }
