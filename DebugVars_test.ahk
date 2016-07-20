@@ -35,6 +35,11 @@ DV_ContextMenu(dv, node, isRightClick, x, y) {
 }
 
 DV_EditNode(dv, node) {
+    if IsObject(node.value) {
+        dv := new DebugVars(new DvObjectNode(node.value))
+        dv.Show()
+        return
+    }
 	ed := new DebugVar({name: node.name, value: node.value, type: dv_type(node.value)})
     ed.OnSave := Func("ED_Save").Bind(dv, node)
     ed.Show()
