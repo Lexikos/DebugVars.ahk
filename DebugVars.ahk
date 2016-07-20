@@ -118,8 +118,7 @@ class DebugVars extends DebugVars_Base
     }
 
     InsertProp(r, item) {
-        has_children := item.HasChildren()
-        opt := has_children ? "Icon" (item.expanded ? 3 : 2) : ""
+        opt := item.expandable ? "Icon" (item.expanded ? 3 : 2) : ""
         valueText := item.GetValueString()
         ObjAddRef(&item)
         LV_Insert(r, opt, item.name, valueText, &item)
@@ -198,7 +197,7 @@ class DebugVars extends DebugVars_Base
 
     ExpandContract(r) {
         item := this.LV_Data(r)
-        if !item.HasChildren()
+        if !item.expandable
             return
         GuiControl -Redraw, % this.hLV
         if item.expanded := !item.expanded
@@ -247,7 +246,7 @@ class DebugVars extends DebugVars_Base
         if (rW > client_width)
             rW := client_width
         ; Move the edit control into position and show it
-        this.EditText := item.HasChildren()
+        this.EditText := item.expandable
             ? (LV_GetText(value, r, this.COL_VALUE) ? value : "")
             : item.value
         GuiControl,, % this.hLVEdit, % this.EditText
@@ -325,14 +324,14 @@ class DebugVars extends DebugVars_Base
             if (r = 1)
                 return
             LV_Modify(--r, "Select Focus")
-            if !this.LV_Data(r).HasChildren()
+            if !this.LV_Data(r).expandable
                 this.BeginEdit(r)
             return true
         }
         return this.LV_Enter(r, node)
     }
     LV_Enter(r, node) {
-        if !node.HasChildren() {
+        if !node.expandable {
             this.BeginEdit(r)
             return true
         }
@@ -354,7 +353,7 @@ class DebugVars extends DebugVars_Base
         return true
     }
     LV_Right(r, node) {
-        if node.HasChildren()
+        if node.expandable
             if node.expanded
                 LV_Modify(r+1, "Select Focus")
             else

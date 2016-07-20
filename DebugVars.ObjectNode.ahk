@@ -24,8 +24,10 @@ class DvObjectNode extends DebugVars_Base
         return nodes
     }
     
-    HasChildren() {
-        return IsObject(this.value)
+    expandable {
+        get {
+            return IsObject(this.value)
+        }
     }
     
     GetValueString() {
