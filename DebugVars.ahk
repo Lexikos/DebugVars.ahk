@@ -457,17 +457,10 @@ class DebugVars extends DebugVars_Base
     
     class GuiScope {
         __New() {
-            this.last_found := WinExist()
-            Gui +LastFoundExist  ; Limitation: Setting default Gui name without creating Gui won't work.
-            this.last_gui := WinExist()
+            this.prev_gui := A_DefaultGui
         }
         __Delete() {
-            if (last_gui := this.last_gui) && DllCall("IsWindow", "ptr", last_gui)
-                Gui %last_gui%: Default
-            else
-                Gui 1: Default  ; Just a guess; better than leaving our Gui as default.
-            if last_found := this.last_found
-                WinExist("ahk_id " last_found)
+            Gui % this.prev_gui ":Default"
         }
     }
     
