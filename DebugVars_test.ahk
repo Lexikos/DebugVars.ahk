@@ -51,7 +51,9 @@ ED_Save(dv, node, ed, value, type) {
     else if (type = "float")
         value += 0.0
     node.SetValue(value)
+    dv.EnableRedraw(false)
     dv.Reset()
+    dv.EnableRedraw(true)
     ed.Var.value := value
     ed.Var.type := type
 }
