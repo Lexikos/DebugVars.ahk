@@ -1,8 +1,8 @@
 ﻿
 myvar := 42
 ; myvartype := "undefined"
-; myvartype := "string"
-myvartype := "integer"
+myvartype := "string"
+; myvartype := "integer"
 ; myvartype := "float"
 
 dv := new DebugVarTest({name: "myvar", value: myvar, type: myvartype})

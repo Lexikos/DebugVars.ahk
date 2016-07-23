@@ -73,7 +73,7 @@ class DebugVar {
         fn := this.ChangeType.Bind(this)
         GuiControl +g, % hType, % fn
         
-        GuiControlGet c, Pos, % this.hType
+        GuiControlGet c, Pos, % hType
         this.footerH := cH
         
         Gui Add, Radio, x+m h%cH% hwndhLF, LF
