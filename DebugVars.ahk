@@ -21,7 +21,7 @@ class DebugVars_Base
 */
 class DebugVars extends DebugVars_Base
 {
-    static COL_NAME := 1, COL_VALUE := 2, COL_DATA := 3, ICON_SIZE := 16
+    static COL_NAME := 1, COL_VALUE := 2, ICON_SIZE := 16
     
     static Instances  ; Hwnd:Object map of visible instances.
     
@@ -56,7 +56,7 @@ class DebugVars extends DebugVars_Base
         Gui Add, Edit, hwndhLVEdit Hidden
         Gui Add, ListView, xp yp hwndhLV AltSubmit w500 h300
             ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
-            +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value|Data
+            +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value
         Gui -DPIScale
         
         this.hLV     := hLV
@@ -71,7 +71,6 @@ class DebugVars extends DebugVars_Base
         this.Populate()
         
         LV_ModifyCol(this.COL_NAME, 150)
-        LV_ModifyCol(this.COL_DATA, 0)
         this.AutoSizeValueColumn()
     }
     
@@ -121,7 +120,8 @@ class DebugVars extends DebugVars_Base
         opt := item.expandable ? "Icon" (item.expanded ? 3 : 2) : ""
         valueText := item.GetValueString()
         ObjAddRef(&item)
-        LV_Insert(r, opt, item.name, valueText, &item)
+        LV_Insert(r, opt, item.name, valueText)
+        this.LV_SetItemParam(r, &item)
         if item.level
             this.LV_SetItemIndent(r, item.level)
         ++r
@@ -183,16 +183,12 @@ class DebugVars extends DebugVars_Base
     }
 
     LV_Data(r) {
-        if LV_GetText(data, r, this.COL_DATA)
+        if data := this.LV_GetItemParam(r)
             return Object(data)
         throw Exception("Bad row", -1, r)
     }
     LV_FindData(obj) {
-        Loop % LV_GetCount() {
-            LV_GetText(data, A_Index, this.COL_DATA)
-            if (data == &obj)
-                return A_Index
-        }
+        return this.LV_FindItemParam(&obj)
     }
 
     ExpandContract(r) {
@@ -419,16 +415,42 @@ class DebugVars extends DebugVars_Base
         return ErrorLevel
     }
     LV_SetItemIndent(row, numIcons) {
-        static LVM_SETITEM := A_IsUnicode ? 0x104C : 0x1006 ; LVM_SETITEMW : LVM_SETITEMA
-        static LVITEM_SIZE := 48 + (A_PtrSize * 3)
-        static LVIF_INDENT := 0x00000010
+        ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
         static OffIndent := 24 + (A_PtrSize * 3)
-        VarSetCapacity(lvitem, LVITEM_SIZE, 0)
-        NumPut(LVIF_INDENT, lvitem, 0, "UInt")
-        NumPut(row - 1, lvitem, 4, "Int")
-        NumPut(numIcons, lvitem, OffIndent, "Int")
-        SendMessage % LVM_SETITEM, 0, % &lvitem, , % "ahk_id " this.hLV
+        this.LV_LVITEM(LVITEM, 0x00000010, row) ; LVIF_INDENT
+        NumPut(numIcons, LVITEM, OffIndent, "Int")
+        SendMessage, 0x1006, 0, % &LVITEM, , % "ahk_id " this.hLV
         return ErrorLevel
+    }
+    LV_GetItemParam(row) {
+        ; LVM_GETITEM -> http://msdn.microsoft.com/en-us/library/bb774953(v=vs.85).aspx
+        static LVM_GETITEM := A_IsUnicode ? 0x104B : 0x1005 ; LVM_GETITEMW : LVM_GETITEMA
+        static OffParam := 24 + (A_PtrSize * 2)
+        this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
+        SendMessage, % LVM_GETITEM, 0, % &LVITEM, , % "ahk_id " this.hLV
+        return NumGet(LVITEM, OffParam, "UPtr")
+    }
+    LV_SetItemParam(row, value) {
+        ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
+        static OffParam := 24 + (A_PtrSize * 2)
+        this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
+        NumPut(value, LVITEM, OffParam, "UPtr")
+        SendMessage, 0x1006, 0, % &LVITEM, , % "ahk_id " this.hLV
+        return ErrorLevel
+    }
+    LV_LVITEM(ByRef LVITEM, mask := 0, row := 1, col := 1) {
+        static LVITEMSize := 48 + (A_PtrSize * 3)
+        VarSetCapacity(LVITEM, LVITEMSize, 0)
+        NumPut(mask, LVITEM, 0, "UInt"), NumPut(row - 1, LVITEM, 4, "Int"), NumPut(col - 1, LVITEM, 8, "Int")
+    }
+    LV_FindItemParam(param, start := 0) { ; Based on LV_EX_FindString
+        ; LVM_FINDITEMA = 0x100D -> http://msdn.microsoft.com/en-us/library/bb774903
+        static LVFISize := 40
+        VarSetCapacity(LVFI, LVFISize, 0) ; LVFINDINFO
+        NumPut(0x1, LVFI, 0, "UInt") ; LVFI_PARAM
+        NumPut(param, LVFI, A_PtrSize * 2, "Ptr") ; lParam
+        SendMessage, 0x100D, % (start - 1), % &LVFI, , % "ahk_id " this.hLV
+        return (ErrorLevel > 0x7FFFFFFF ? 0 : ErrorLevel + 1)
     }
     
     class GuiScope {
