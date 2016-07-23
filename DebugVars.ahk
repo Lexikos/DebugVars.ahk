@@ -69,9 +69,6 @@ class DebugVars extends DebugVars_Base
         LV_SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", DebugVars.ImageList, "ptr"))
         
         this.Populate()
-        
-        LV_ModifyCol(this.COL_NAME, 150)
-        this.AutoSizeValueColumn()
     }
     
     Populate() {
@@ -80,6 +77,8 @@ class DebugVars extends DebugVars_Base
             node.level := 0
             r := this.InsertProp(r, node)
         }
+        LV_ModifyCol(this.COL_NAME, 150)
+        this.AutoSizeValueColumn()
     }
     
     Reset() {
@@ -107,10 +106,15 @@ class DebugVars extends DebugVars_Base
         Gui % this.hGui ":Destroy"
     }
     
-    AutoSizeValueColumn(min_width:=0) {
+    AutoSizeValueColumn() {
+        ; Get available space
         VarSetCapacity(rect, 16, 0)
         DllCall("GetClientRect", "ptr", this.hLV, "ptr", &rect)
         value_width := NumGet(rect,8,"int") - this.LV_GetColumnWidth(this.COL_NAME)
+        ; Get width of largest value
+        LV_ModifyCol(this.COL_VALUE)
+        min_width := this.LV_GetColumnWidth(this.COL_VALUE)
+        ; Size to fit largest value or fill available space
         if (value_width < min_width)
             value_width := min_width
         LV_ModifyCol(this.COL_VALUE, value_width)
@@ -381,18 +385,16 @@ class DebugVars extends DebugVars_Base
         if (code = -306 || code = -326) { ; HDN_BEGINTRACK A|W
             column := NumGet(lParam + A_PtrSize*3, "int") + 1
             if (column = this.COL_NAME) {
-                LV_ModifyCol(this.COL_VALUE) ; See below.
+                ; Size the value column so that the scroll bars act sensibly while
+                ; resizing the name column.
+                LV_ModifyCol(this.COL_VALUE)
                 return false
             }
             return true ; Prevent tracking.
         }
         if (code = -306 || code = -327) { ; HDN_ENDTRACK A|W
             ; This must be the Name column, since otherwise tracking was prevented.
-            ; Auto-size the Value column so that it fills the available space, but
-            ; don't shrink it smaller than the size set when tracking began above;
-            ; i.e. the size of the widest value.  It was set when tracking began
-            ; to avoid the effect of the scroll bar shrinking when tracking ends.
-            this.AutoSizeValueColumn(this.LV_GetColumnWidth(this.COL_VALUE))
+            this.AutoSizeValueColumn()
             return true
         }
     }
