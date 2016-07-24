@@ -54,7 +54,7 @@ class DebugVars extends DebugVars_Base
         Gui New, hwndhGui LabelDebugVars_Gui +Resize
         Gui Margin, 0, 0
         Gui Add, Edit, hwndhLVEdit Hidden
-        Gui Add, ListView, xp yp hwndhLV AltSubmit w500 h300
+        Gui Add, ListView, xp yp hwndhLV w500 h300
             ; LV styles: +LV0x10000 doublebuffer, -LV0x10 headerdragdrop
             +0x4000000 +LV0x10000 -LV0x10 -Multi NoSortHdr, Name|Value
         Gui -DPIScale
