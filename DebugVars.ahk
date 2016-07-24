@@ -107,17 +107,7 @@ class DebugVars extends DebugVars_Base
     }
     
     AutoSizeValueColumn() {
-        ; Get available space
-        VarSetCapacity(rect, 16, 0)
-        DllCall("GetClientRect", "ptr", this.hLV, "ptr", &rect)
-        value_width := NumGet(rect,8,"int") - this.LV_GetColumnWidth(this.COL_NAME)
-        ; Get width of largest value
-        LV_ModifyCol(this.COL_VALUE)
-        min_width := this.LV_GetColumnWidth(this.COL_VALUE)
-        ; Size to fit largest value or fill available space
-        if (value_width < min_width)
-            value_width := min_width
-        LV_ModifyCol(this.COL_VALUE, value_width)
+        LV_ModifyCol(this.COL_VALUE, "AutoHdr")
     }
 
     InsertProp(r, item) {
@@ -411,11 +401,6 @@ class DebugVars extends DebugVars_Base
     }
     
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
-    LV_GetColumnWidth(column) {
-        static LVM_GETCOLUMNWIDTH := 0x101D
-        SendMessage % LVM_GETCOLUMNWIDTH, % column-1, 0,, % "ahk_id " this.hLV
-        return ErrorLevel
-    }
     LV_SetItemIndent(row, numIcons) {
         ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
         static OffIndent := 24 + (A_PtrSize * 3)
