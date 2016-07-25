@@ -1,8 +1,15 @@
 
-class DvObjectNode extends DebugVars_Base
+class DvObjectNode extends TreeListView._Base
 {
-    __new(value) {
+    __new(value, name:="") {
         this.value := value
+        this.values := [name, this._GetValueString(value)]
+    }
+    
+    expandable {
+        get {
+            return IsObject(this.value)
+        }
     }
     
     children {
@@ -13,25 +20,17 @@ class DvObjectNode extends DebugVars_Base
     }
     
     _MakeChildren() {
-        nodes := []
+        children := []
         for k,v in this.value {
-            child := new DvObjectNode(v)
+            child := new DvObjectNode(v, this._GetValueString(k))
             child.key := k
-            child.name := IsObject(k) ? "Object(" (&k) ")" : k
             child.container := this.value
-            nodes.Push(child)
+            children.Push(child)
         }
-        return nodes
+        return children
     }
     
-    expandable {
-        get {
-            return IsObject(this.value)
-        }
-    }
-    
-    GetValueString() {
-        value := this.value
+    _GetValueString(value) {
         if IsObject(value) {
             try if value.ToString
                 return value.ToString()
@@ -47,5 +46,6 @@ class DvObjectNode extends DebugVars_Base
         this.container[this.key] := value
         ; Update our copy of the value
         this.value := value
+        this.values[2] := this._GetValueString(value)
     }
 }
