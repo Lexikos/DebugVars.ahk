@@ -45,6 +45,18 @@ class DebugVars extends TreeListView._Base
             base.ExpandContract(r)
             this.AutoSizeValueColumn()  ; Adjust for +/-scrollbars
         }
+        
+        BeforeHeaderResize(column) {
+            if (column != this.COL_NAME)
+                return true
+            ; Collapse to fit just the value so that scrollbars will be
+            ; visible only when needed.
+            LV_ModifyCol(this.COL_VALUE, "Auto")
+        }
+        
+        AfterHeaderResize(column) {
+            this.AutoSizeValueColumn()
+        }
     }
     
     Show(options:="", title:="") {

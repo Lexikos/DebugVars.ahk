@@ -481,7 +481,9 @@ class TreeListView extends TreeListView._Base
     
     OnWmNotify(wParam, lParam) {
         Critical 1000
-        if !(this := this.Instances[NumGet(lParam+0, "ptr")])
+        hwndFrom := NumGet(lParam+0, "ptr")
+        if !(this := TreeListView.Instances[hwndFrom])
+        && !(this := TreeListView.Instances[DllCall("GetParent", "ptr", hwndFrom, "ptr")]) ; For HDN.
             return
         code := NumGet(lParam + A_PtrSize*2, "int")
         if (code = -180 || code = -181) { ; LVN_BEGINSCROLL || LVN_ENDSCROLL
@@ -493,7 +495,7 @@ class TreeListView extends TreeListView._Base
             column := NumGet(lParam + A_PtrSize*3, "int") + 1
             return this.BeforeHeaderResize(column)
         }
-        if (code = -306 || code = -327) && this.AfterHeaderResize { ; HDN_ENDTRACK A|W
+        if (code = -307 || code = -327) && this.AfterHeaderResize { ; HDN_ENDTRACK A|W
             column := NumGet(lParam + A_PtrSize*3, "int") + 1
             return this.AfterHeaderResize(column)
         }
