@@ -114,7 +114,6 @@ class TreeListView extends TreeListView._Base
     
     InsertProp(r, item) {
         opt := item.expandable ? "Icon" (item.expanded ? 3 : 2) : ""
-        ObjAddRef(&item)
         LV_Insert(r, opt, item.values*)
         this.LV_SetItemParam(r, &item)
         if item.level
@@ -125,7 +124,7 @@ class TreeListView extends TreeListView._Base
         return r ; The row after the inserted items.
     }
     RemoveProp(r) {
-        ObjRelease(&(item := this.LV_Data(r)))
+        item := this.LV_Data(r)
         LV_Delete(r)
         if item.expanded
             this.RemoveChildren(r, item)

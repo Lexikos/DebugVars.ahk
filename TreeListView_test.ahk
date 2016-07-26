@@ -3,14 +3,28 @@
 Gui -DPIScale
 testobj := {one: [1,2,3], two: {foo: 1, bar: 2, baz: 3}, z:[]}
 tlv := new TreeListViewTest(new TestNode(testobj), "w600 h400", "One|Two|Three")
+tlv.MinEditColumn := 1
+tlv.MaxEditColumn := 2
 Gui Add, Button,, test button
 Gui Show
 
+; For testing cleanup of nodes (on control destruction
+; or when object (value 2) is replaced with string):
+tlv.root.children[3].children.push(new RefCountTestNode)
+class RefCountTestNode {
+    values := ["One", "Two"]
+    __delete() {
+        MsgBox Delete RefCountTestNode
+    }
+}
+
 GuiEscape() {
+    Gui Destroy
+    tlv := ""
     ExitApp
 }
 GuiClose() {
-    ExitApp
+    GuiEscape()
 }
 
 class TreeListViewTest extends TreeListView {
