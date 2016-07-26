@@ -244,6 +244,7 @@ class TreeListView extends TreeListView._Base
         GuiControl Hide, % this.hEdit
     }
     SaveEdit(reason:="") {
+        restore_gui_on_return := this.LV_BeginScope()
         if !(r := this.EditRow)
             throw Exception("Not editing", -1)
         GuiControlGet value,, % this.hEdit
@@ -255,8 +256,7 @@ class TreeListView extends TreeListView._Base
         this.EditRow := ""
         this.EditColumn := ""
         GuiControl Hide, % this.hEdit
-        if node.SetValue(value, c) != 0
-        {
+        if node.SetValue(value, c) != 0 {
             LV_Modify(r, "Col" c, value)
             if (!node.expandable && node.children) { ; FIXME: This doesn't belong here
                 ; Since value is a string, node can't be expanded
