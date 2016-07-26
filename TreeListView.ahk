@@ -61,7 +61,7 @@ class TreeListView extends TreeListView._Base
         Gui Add, ListView, NoSortHdr +0x4000000 %Options% hwndhLV, %Headers%
         this.hGui := hGui
         this.hLV := hLV
-        this.hLVEdit := hEdit
+        this.hEdit := hEdit
         this.RegisterHwnd()
         
         ; Copy the ImageList, otherwise it gets destroyed the first time a ListView
@@ -76,12 +76,12 @@ class TreeListView extends TreeListView._Base
     
     RegisterHwnd() {
         TreeListView.Instances[this.hLV] := this
-        TreeListView.InstancesEdit[this.hLVEdit] := this
+        TreeListView.InstancesEdit[this.hEdit] := this
     }
     
     UnregisterHwnd() {
         TreeListView.Instances.Delete(this.hLV)
-        TreeListView.InstancesEdit.Delete(this.hLVEdit)
+        TreeListView.InstancesEdit.Delete(this.hEdit)
     }
     
     OnDestroy() {
@@ -222,23 +222,23 @@ class TreeListView extends TreeListView._Base
             rW := client_width
         ; Move the edit control into position and show it
         this.EditText := "" node.values[column]
-        GuiControl,, % this.hLVEdit, % this.EditText
-        GuiControl Move, % this.hLVEdit, x%rL% y%rT% w%rW% h%rH%
-        GuiControl Show, % this.hLVEdit
-        GuiControl Focus, % this.hLVEdit
+        GuiControl,, % this.hEdit, % this.EditText
+        GuiControl Move, % this.hEdit, x%rL% y%rT% w%rW% h%rH%
+        GuiControl Show, % this.hEdit
+        GuiControl Focus, % this.hEdit
         static EM_SETSEL := 0xB1
-        SendMessage % EM_SETSEL, 0, -1,, % "ahk_id " this.hLVEdit
+        SendMessage % EM_SETSEL, 0, -1,, % "ahk_id " this.hEdit
         return true
     }
     CancelEdit() {
         this.EditRow := ""
         this.EditColumn := ""
-        GuiControl Hide, % this.hLVEdit
+        GuiControl Hide, % this.hEdit
     }
     SaveEdit(reason:="") {
         if !(r := this.EditRow)
             throw Exception("Not editing", -1)
-        GuiControlGet value,, % this.hLVEdit
+        GuiControlGet value,, % this.hEdit
         node := this.NodeFromRow(r)
         if this.EditText == "" value  ; Avoid erasing objects.
             return this.CancelEdit()
@@ -246,7 +246,7 @@ class TreeListView extends TreeListView._Base
         GuiControl -Redraw, % this.hLV
         this.EditRow := ""
         this.EditColumn := ""
-        GuiControl Hide, % this.hLVEdit
+        GuiControl Hide, % this.hEdit
         if node.SetValue(value, c) != 0
         {
             LV_Modify(r, "Col" c, value)
@@ -261,7 +261,7 @@ class TreeListView extends TreeListView._Base
         GuiControl +Redraw, % this.hLV
     }
     IsEditing() {
-        return DllCall("IsWindowVisible", "ptr", this.hLVEdit)
+        return DllCall("IsWindowVisible", "ptr", this.hEdit)
     }
     
     ;}
