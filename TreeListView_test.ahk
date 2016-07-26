@@ -18,6 +18,8 @@ class RefCountTestNode {
     }
 }
 
+F5::tlv.Reset()
+
 GuiEscape() {
     Gui Destroy
     tlv := ""

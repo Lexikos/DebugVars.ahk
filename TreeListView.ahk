@@ -105,8 +105,7 @@ class TreeListView extends TreeListView._Base
     
     Reset() {
         restore_gui_on_return := this.LV_BeginScope()
-        while LV_GetCount()
-            this.RemoveProp(1)
+        LV_Delete()
         this.Populate()
     }
     
