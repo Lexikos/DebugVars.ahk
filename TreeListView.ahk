@@ -445,7 +445,7 @@ class TreeListView extends TreeListView._Base
     ;{ Static Message Handlers
     
     OnWmDestroy(w, l, m, hwnd) {
-        for hLV, tlv in this.Instances
+        for hLV, tlv in this.Instances.Clone()
             if tlv.hGui == hwnd
                 tlv.OnDestroy()
     }
