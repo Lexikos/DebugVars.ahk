@@ -94,7 +94,7 @@ class TreeListView extends TreeListView._Base
         r := 1
         for i, node in this.root.children {
             node.level := 0
-            r := this.InsertProp(r, node)
+            r := this.InsertRow(r, node)
         }
         this.AfterPopulate()
     }
@@ -111,57 +111,57 @@ class TreeListView extends TreeListView._Base
     
     ;{ Row Management
     
-    InsertProp(r, item) {
-        opt := item.expandable ? "Icon" (item.expanded ? 3 : 2) : ""
-        LV_Insert(r, opt, item.values*)
-        this.LV_SetItemParam(r, &item)
-        if item.level
-            this.LV_SetItemIndent(r, item.level)
+    InsertRow(r, node) {
+        opt := node.expandable ? "Icon" (node.expanded ? 3 : 2) : ""
+        LV_Insert(r, opt, node.values*)
+        this.LV_SetItemParam(r, &node)
+        if node.level
+            this.LV_SetItemIndent(r, node.level)
         ++r
-        if item.expanded
-            r := this.InsertChildren(r, item)
+        if node.expanded
+            r := this.InsertChildren(r, node)
         return r ; The row after the inserted items.
     }
-    RemoveProp(r) {
-        item := this.LV_Data(r)
+    RemoveRow(r) {
+        node := this.NodeFromRow(r)
         LV_Delete(r)
-        if item.expanded
-            this.RemoveChildren(r, item)
-        return item
+        if node.expanded
+            this.RemoveChildren(r, node)
+        return node
     }
-    InsertChildren(r, item) {
-        level := item.level + 1
-        for _, child in item.children {
+    InsertChildren(r, node) {
+        level := node.level + 1
+        for _, child in node.children {
             child.level := level
-            r := this.InsertProp(r, child)
+            r := this.InsertRow(r, child)
         }
         return r
     }
-    RemoveChildren(r, item) {
-        Loop % item.children.Length()
-            this.RemoveProp(r)
+    RemoveChildren(r, node) {
+        Loop % node.children.Length()
+            this.RemoveRow(r)
     }
     
     ExpandContract(r) {
-        item := this.LV_Data(r)
-        if !item.expandable
+        node := this.NodeFromRow(r)
+        if !node.expandable
             return
         GuiControl -Redraw, % this.hLV
-        if item.expanded := !item.expanded
-            this.InsertChildren(r+1, item)
+        if node.expanded := !node.expanded
+            this.InsertChildren(r+1, node)
         else
-            this.RemoveChildren(r+1, item)
+            this.RemoveChildren(r+1, node)
         LV_Modify(0, "-Select")
-        LV_Modify(r, "Select Focus Icon" (2+item.expanded))
+        LV_Modify(r, "Select Focus Icon" (2+node.expanded))
         GuiControl +Redraw, % this.hLV
     }
 
-    LV_Data(r) {
+    NodeFromRow(r) {
         if data := this.LV_GetItemParam(r)
             return Object(data)
         throw Exception("Bad row", -1, r)
     }
-    LV_FindData(obj) {
+    RowFromNode(obj) {
         return this.LV_FindItemParam(&obj)
     }
     
@@ -184,7 +184,7 @@ class TreeListView extends TreeListView._Base
             column := this.MinEditColumn
         if !this.CanEdit(r, column)
             return false
-        item := this.LV_Data(r)
+        node := this.NodeFromRow(r)
         static LVIR_LABEL := 2
         static LVM_GETSUBITEMRECT := 0x1038
         VarSetCapacity(rect, 16, 0)
@@ -221,7 +221,7 @@ class TreeListView extends TreeListView._Base
         if (rW > client_width)
             rW := client_width
         ; Move the edit control into position and show it
-        this.EditText := "" item.values[column]
+        this.EditText := "" node.values[column]
         GuiControl,, % this.hLVEdit, % this.EditText
         GuiControl Move, % this.hLVEdit, x%rL% y%rT% w%rW% h%rH%
         GuiControl Show, % this.hLVEdit
@@ -239,7 +239,7 @@ class TreeListView extends TreeListView._Base
         if !(r := this.EditRow)
             throw Exception("Not editing", -1)
         GuiControlGet value,, % this.hLVEdit
-        node := this.LV_Data(r)
+        node := this.NodeFromRow(r)
         if this.EditText == "" value  ; Avoid erasing objects.
             return this.CancelEdit()
         c := this.EditColumn
@@ -278,7 +278,7 @@ class TreeListView extends TreeListView._Base
                 }
                 return
             }
-            node := this.LV_Data(r)
+            node := this.NodeFromRow(r)
         }
         if IsFunc(this[ctrl "_Key_" key])
             return this[ctrl "_Key_" key](r, node)
@@ -302,7 +302,7 @@ class TreeListView extends TreeListView._Base
         }
         else if (c > this.MaxEditColumn) {
             if (r = LV_GetCount()) {
-                node := this.LV_Data(r)
+                node := this.NodeFromRow(r)
                 if node.expandable && !node.expanded {
                     ; Expand as if Tab was pressed while not editing,
                     ; but continue editing
@@ -357,7 +357,7 @@ class TreeListView extends TreeListView._Base
             if (r = 1)
                 return
             this.LV_Focus(--r)
-            if !this.LV_Data(r).expandable
+            if !this.NodeFromRow(r).expandable
                 this.BeginEdit(r, this.MaxEditColumn)
             return true
         }
@@ -384,7 +384,7 @@ class TreeListView extends TreeListView._Base
         }
         loop
             r -= 1
-        until r < 1 || this.LV_Data(r).level < node.level
+        until r < 1 || this.NodeFromRow(r).level < node.level
         if r
             this.LV_Focus(r)
         return true
@@ -427,11 +427,11 @@ class TreeListView extends TreeListView._Base
     FocusedItem {
         get {
             restore_gui_on_return := this.LV_BeginScope()
-            return (r := LV_GetNext(,"F")) ? this.LV_Data(r) : ""
+            return (r := LV_GetNext(,"F")) ? this.NodeFromRow(r) : ""
         }
         set {
             restore_gui_on_return := this.LV_BeginScope()
-            if !(r := this.LV_FindData(value))
+            if !(r := this.RowFromNode(value))
                 return ""
             this.LV_Focus(r)
             return value
@@ -474,7 +474,7 @@ class TreeListView extends TreeListView._Base
             return true
         }
         if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.OnDoubleClick) {
-            if node := this.LV_Data(r)
+            if node := this.NodeFromRow(r)
                 this.OnDoubleClick(node)
         }
     }
