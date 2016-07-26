@@ -14,17 +14,15 @@ class TreeListView extends TreeListView._Base
 {
     static ICON_SIZE := 16
     
-    static Instances  ; Hwnd:Object map of controls/instances
-    static InstancesEdit
+    static FromHwnd  ; Hwnd:Object map of controls/instances
     
     ; MinEditColumn := 0 ; Disabled
     ; MaxEditColumn := 0
     
     InitClass() {
-        if this.Instances
+        if this.FromHwnd
             return
-        this.Instances := {}
-        this.InstancesEdit := {}
+        this.FromHwnd := {}
         
         il := DllCall("comctl32.dll\ImageList_Create"
             , "int", this.ICON_SIZE, "int", this.ICON_SIZE
@@ -62,6 +60,14 @@ class TreeListView extends TreeListView._Base
         this.hGui := hGui
         this.hLV := hLV
         this.hEdit := hEdit
+        
+        static LVM_GETHEADER := 0x101F
+        SendMessage % LVM_GETHEADER,,,, % "ahk_id " this.hLV
+        this.hLVH := ErrorLevel
+        
+        this.CtrlName[hLV] := "LV"
+        this.CtrlName[hEdit] := "Edit"
+        
         this.RegisterHwnd()
         
         ; Copy the ImageList, otherwise it gets destroyed the first time a ListView
@@ -75,13 +81,15 @@ class TreeListView extends TreeListView._Base
     ;{ Life Cycle
     
     RegisterHwnd() {
-        TreeListView.Instances[this.hLV] := this
-        TreeListView.InstancesEdit[this.hEdit] := this
+        TreeListView.FromHwnd[this.hLV] := this
+        TreeListView.FromHwnd[this.hEdit] := this
+        TreeListView.FromHwnd[this.hLVH] := this
     }
     
     UnregisterHwnd() {
-        TreeListView.Instances.Delete(this.hLV)
-        TreeListView.InstancesEdit.Delete(this.hEdit)
+        TreeListView.FromHwnd.Delete(this.hLV)
+        TreeListView.FromHwnd.Delete(this.hEdit)
+        TreeListView.FromHwnd.Delete(this.hLVH)
     }
     
     OnDestroy() {
@@ -443,13 +451,14 @@ class TreeListView extends TreeListView._Base
     ;{ Static Message Handlers
     
     OnWmDestroy(w, l, m, hwnd) {
-        for hLV, tlv in this.Instances.Clone()
-            if tlv.hGui == hwnd
+        for h, tlv in TreeListView.FromHwnd.Clone()
+            if (tlv.hGui == hwnd && tlv.hLV == h)
                 tlv.OnDestroy()
     }
     
     OnWmLButtonDown(wParam, lParam, msg, hwnd) {
-        if !(this := this.Instances[hwnd])
+        if !(this := TreeListView.FromHwnd[hwnd])
+         || (hwnd != this.hLV)
             return
         static LVM_SUBITEMHITTEST := 0x1039
         static LVHT_ONITEMICON := 2
@@ -482,8 +491,7 @@ class TreeListView extends TreeListView._Base
     OnWmNotify(wParam, lParam) {
         Critical 1000
         hwndFrom := NumGet(lParam+0, "ptr")
-        if !(this := TreeListView.Instances[hwndFrom])
-        && !(this := TreeListView.Instances[DllCall("GetParent", "ptr", hwndFrom, "ptr")]) ; For HDN.
+        if !(this := TreeListView.FromHwnd[hwndFrom])
             return
         code := NumGet(lParam + A_PtrSize*2, "int")
         if (code = -180 || code = -181) { ; LVN_BEGINSCROLL || LVN_ENDSCROLL
@@ -502,18 +510,15 @@ class TreeListView extends TreeListView._Base
     }
     
     OnWmKeyDown(wParam, lParam, msg, hwnd) {
-        if (tlv := this.Instances[hwnd])
-            ctrl := "LV"
-        else if (tlv := this.InstancesEdit[hwnd])
-            ctrl := "Edit"
-        else
+        if !(this := TreeListView.FromHwnd[hwnd])
+        || !(ctrl := this.CtrlName[hwnd])
             return
         keyname := GetKeyName(Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
-        return tlv.OnKeyDown(ctrl, keyname)
+        return this.OnKeyDown(ctrl, keyname)
     }
     
     OnWmCommand(wParam, lParam) {
-        if !(this := this.InstancesEdit[lParam])
+        if !(this := TreeListView.FromHwnd[lParam])
             return
         static EN_KILLFOCUS := 0x200
         if ((wParam >> 16) = EN_KILLFOCUS) {
