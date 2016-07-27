@@ -18,6 +18,8 @@ class RefCountTestNode {
     }
 }
 
+#IfWinActive TreeListView_Test.ahk ahk_class AutoHotkeyGUI
+
 F5::tlv.Reset()
 
 GuiEscape() {
