@@ -44,6 +44,7 @@ class TreeListView extends TreeListView._Base
         TreeListView.InitClass()
         
         this.root := RootNode
+        RootNode.expanded := true
         
         restore_gui_on_return := new this.GuiScope()
         
@@ -171,6 +172,37 @@ class TreeListView extends TreeListView._Base
     }
     RowFromNode(obj) {
         return this.LV_FindItemParam(&obj)
+    }
+    
+    ;}
+    
+    ;{ Tree Management
+    
+    InsertChild(parent, i, child) {
+        if (node := parent.children[i]) {
+            ; Insert before this node
+            r := this.RowFromNode(node)
+        }
+        else if parent.expanded {
+            ; Find the last visible descendent (parent if none)
+            node := parent
+            loop
+                node := node.children[node.children.Length()]
+            until !node.expanded
+            ; Insert after this node
+            if (r := this.RowFromNode(node))
+                r += 1
+        }
+        parent.children.InsertAt(i, child)
+        child.level := (parent == this.root) ? 0 : parent.level + 1
+        if r
+            this.InsertRow(r, child)
+    }
+    RemoveChild(parent, i) {
+        if !(child := parent.children.RemoveAt(i))
+            throw Exception("No child at index " i, -1)
+        if (r := this.RowFromNode(child))
+            this.RemoveRow(r)
     }
     
     ;}

@@ -1,7 +1,7 @@
 #Include TreeListView.ahk
 
 Gui -DPIScale
-testobj := {one: [1,2,3], two: {foo: 1, bar: 2, baz: 3}, z:[]}
+testobj := {one: [1,2,3], two: {foo: 1, bar: 2, baz: 3}}
 tlv := new TreeListViewTest(new TestNode(testobj), "w600 h400", "One|Two|Three")
 tlv.MinEditColumn := 1
 tlv.MaxEditColumn := 2
@@ -10,7 +10,9 @@ Gui Show
 
 ; For testing cleanup of nodes (on control destruction
 ; or when object (value 2) is replaced with string):
-tlv.root.children[3].children.push(new RefCountTestNode)
+; tlv.root.children[3].children.push(new RefCountTestNode)
+tlv.InsertChild(tlv.root, 3, nz := new TestNode([], "z"))
+tlv.InsertChild(nz, 1, new RefCountTestNode), nz := ""
 class RefCountTestNode {
     values := ["One", "Two"]
     __delete() {
@@ -19,6 +21,9 @@ class RefCountTestNode {
 }
 
 #IfWinActive TreeListView_Test.ahk ahk_class AutoHotkeyGUI
+
+tlv.InsertChild(tlv.root, 2, new TestNode("bar", "foo"))
+F4::tlv.RemoveChild(tlv.root.children[3], 2)
 
 F5::tlv.Reset()
 
@@ -41,8 +46,8 @@ class TreeListViewTest extends TreeListView {
 
 class TestNode
 {
-    __new(value) {
-        this.values := [, value]
+    __new(value, name:="") {
+        this.values := [name, value]
     }
     
     children {
