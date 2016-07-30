@@ -181,6 +181,8 @@ class TreeListView extends TreeListView._Base
     ;{ Tree Management
     
     InsertChild(parent, i, child) {
+        if !IsObject(child)
+            throw Exception("Invalid child", -1, child)
         if (node := parent.children[i]) {
             ; Insert before this node
             r := this.RowFromNode(node)
