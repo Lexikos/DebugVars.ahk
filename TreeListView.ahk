@@ -1,15 +1,4 @@
 
-/*
-    TreeListView
-    
-    Public interface:
-        tlv := new TreeListView(RootNode [, Options, Headers, GuiName])
-        tlv.root
-        tlv.ScrollPos
-        tlv.FocusedNode
-        tlv.Reset()
-        tlv.EnableRedraw(enable)
-*/
 class TreeListView extends TreeListView._Base
 {
     static ICON_SIZE := 16
