@@ -354,61 +354,18 @@ class TreeListView extends TreeListView._Base
     }
     
     Edit_Key_Tab() {
-        r := this.EditRow
-        c := this.EditColumn
-        this.SaveEdit()
-        c += GetKeyState("Shift") ? -1 : 1
-        if (c < this.MinEditColumn) {
-            if (r = 1)
-                return
-            r -= 1 ; Move up
-            c := this.MaxEditColumn
-        }
-        else if (c > this.MaxEditColumn) {
-            if (r = LV_GetCount()) {
-                node := this.NodeFromRow(r)
-                if node.expandable && !node.expanded {
-                    ; Expand as if Tab was pressed while not editing,
-                    ; but continue editing
-                    this.ExpandContract(r)
-                    if (r < LV_GetCount()) {
-                        r += 1
-                        this.LV_Focus(r)
-                        this.BeginEdit(r)
-                        return true
-                    }
-                }
-                ; Tab to the next control after LV (default would be LV itself)
-                if hwnd := DllCall("GetNextDlgTabItem", "ptr", this.hGui, "ptr", this.hLV, "int", false, "ptr")
-                    return DllCall("SetFocus", "ptr", hwnd)
-                return false
-            }
-            r += 1 ; Move down
-            c := this.MinEditColumn
-        }
-        this.LV_Focus(r)
-        this.BeginEdit(r, c)
-        return true
+        delta := GetKeyState("Shift") ? -1 : 1
+        return this.EditNextColumn(delta,, this.EditColumn)
+            || this.EditNextRow(delta)
+            || this.TabNextControl(delta)
     }
     
     Edit_Key_Up() {
-        r := this.EditRow
-        if (r = 1)
-            return
-        r -= 1
-        this.LV_Focus(r)
-        this.BeginEdit(r, this.EditColumn)
-        return true
+        return this.EditNextRow(-1,, this.EditColumn)
     }
     
     Edit_Key_Down() {
-        r := this.EditRow
-        if (r = LV_GetCount())
-            return
-        r += 1
-        this.LV_Focus(r)
-        this.BeginEdit(r, this.EditColumn)
-        return true
+        return this.EditNextRow(+1,, this.EditColumn)
     }
     
     Edit_Key_Escape() {
@@ -417,15 +374,7 @@ class TreeListView extends TreeListView._Base
     }
     
     LV_Key_Tab(r, node) {
-        if GetKeyState("Shift") {
-            if (r = 1)
-                return
-            this.LV_Focus(--r)
-            if !this.NodeFromRow(r).expandable
-                this.BeginEdit(r, this.MaxEditColumn)
-            return true
-        }
-        return this.LV_Key_Enter(r, node)
+        return this.Edit_Key_Tab()
     }
     
     LV_Key_Enter(r, node) {
@@ -461,6 +410,48 @@ class TreeListView extends TreeListView._Base
             else
                 this.ExpandContract(r)
         return true
+    }
+    
+    ;}
+    
+    ;{ Navigation
+    
+    EditNextColumn(delta:=1, r:="", c:="") {
+        ; r and c specify the origin.
+        ; If r is omitted, edit the cell after/before EditRow:EditColumn.
+        ; Else if c is omitted, edit the first/last column of r.
+        if (r == "")
+            r := this.EditRow, (c != "") || (c := this.EditColumn)
+        (r != "") || (r := LV_GetNext(,"F"))
+        (c != "") || (c := delta>0 ? this.MinEditColumn-1 : this.MaxEditColumn+1)
+        loop {
+            c += delta
+            if (c > this.MaxEditColumn || c < this.MinEditColumn)
+                return
+        }
+        until this.CanEdit(r, c) ; Allow derived implementations to restrict editing further.
+        this.LV_Focus(r)
+        this.BeginEdit(r, c)
+        return true
+    }
+    
+    EditNextRow(delta:=1, r:="", c:="") {
+        (r != "") || (r := this.EditRow) || (r := LV_GetNext(,"F"))
+        loop {
+            r += delta
+            if (r > LV_GetCount() || r < 1)
+                return
+        }
+        until c="" ? this.EditNextColumn(delta, r) : this.BeginEdit(r, c)
+        (c != "") && this.LV_Focus(r)
+        return true
+    }
+    
+    TabNextControl(delta:=1) {
+        if ((current := DllCall("GetFocus", "ptr")) == 0 || delta>0 && current == this.hEdit)
+            current := this.hLV  ; Tab to the next control after LV.
+        if hwnd := DllCall("GetNextDlgTabItem", "ptr", this.hGui, "ptr", current, "int", delta<0, "ptr")
+            return DllCall("SetFocus", "ptr", hwnd)
     }
     
     ;}

@@ -42,6 +42,13 @@ class TreeListViewTest extends TreeListView {
         LV_ModifyCol(2, "AutoHdr")
         LV_ModifyCol(3, "AutoHdr")
     }
+    CanEdit(r, c) {
+        ; This is just to show how tabbing works when some cells are
+        ; not editable.
+        if (c != "" && LV_GetText(text, r, c) && InStr(text, "object"))
+            return false
+        return base.CanEdit(r, c)
+    }
 }
 
 ; This is used to construct a tree from an object, but since the TLV
