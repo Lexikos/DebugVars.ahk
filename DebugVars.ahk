@@ -57,6 +57,23 @@ class DebugVars extends TreeListView._Base
         AfterHeaderResize(column) {
             this.AutoSizeValueColumn()
         }
+        
+        SetNodeValue(node, column, value) {
+            if (column != this.COL_VALUE)
+                return
+            if (node.SetValue(value) = 0)
+                return
+            if !(r := this.RowFromNode(node))
+                return
+            LV_Modify(r, "Col" column, value)
+            if (!node.expandable && node.children) {
+                ; Since value is a string, node can't be expanded
+                LV_Modify(r, "Icon1 Col2")
+                this.RemoveChildren(r+1, node)
+                node.children := ""
+                node.expanded := false
+            }
+        }
     }
     
     Show(options:="", title:="") {

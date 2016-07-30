@@ -2,16 +2,16 @@
 
 Gui -DPIScale
 testobj := {one: [1,2,3], two: {foo: 1, bar: 2, baz: 3}}
-tlv := new TreeListViewTest(new TestNode(testobj), "w600 h400", "One|Two|Three")
+tlv := new TreeListViewTest(TestNode(testobj), "w600 h400", "One|Two|Three")
 tlv.MinEditColumn := 1
-tlv.MaxEditColumn := 2
+tlv.MaxEditColumn := 3
 Gui Add, Button,, test button
 Gui Show
 
 ; For testing cleanup of nodes (on control destruction
 ; or when object (value 2) is replaced with string):
 ; tlv.root.children[3].children.push(new RefCountTestNode)
-tlv.InsertChild(tlv.root, 3, nz := new TestNode([], "z"))
+tlv.InsertChild(tlv.root, 3, nz := TestNode([], "z"))
 tlv.InsertChild(nz, 1, new RefCountTestNode), nz := ""
 class RefCountTestNode {
     values := ["One", "Two"]
@@ -22,7 +22,7 @@ class RefCountTestNode {
 
 #IfWinActive TreeListView_Test.ahk ahk_class AutoHotkeyGUI
 
-tlv.InsertChild(tlv.root, 2, new TestNode("bar", "foo"))
+tlv.InsertChild(tlv.root, 2, TestNode("bar", "foo"))
 F4::tlv.RemoveChild(tlv.root.children[3], 2)
 
 F5::tlv.Reset()
@@ -44,55 +44,29 @@ class TreeListViewTest extends TreeListView {
     }
 }
 
-class TestNode
-{
-    __new(value, name:="") {
-        this.values := [name, value]
+; This is used to construct a tree from an object, but since the TLV
+; allows a node to have both editable values and children, they aren't
+; linked (i.e. replacing the initial "Object" value does not affect the
+; child nodes).
+TestNode(value, name:="") {
+    this := {}
+    this.values := [GetValueString(name), GetValueString(value)]
+    if IsObject(value) {
+        this.expandable := true
+        this.children := []
+        for k,v in value
+            this.children.Push(TestNode(v, k))
     }
-    
-    children {
-        get {
-            ; Store the value so 'get' won't be called again:
-            return this.children := this._MakeChildren()
-        }
+    return this
+}
+
+GetValueString(value) {
+    if IsObject(value) {
+        try if value.ToString
+            return value.ToString()
+        try if className := value.__Class
+            return className
+        return "Object"
     }
-    
-    _MakeChildren() {
-        nodes := []
-        for k,v in (container := this.values[2]) {
-            child := new TestNode(v)
-            child.key := k
-            child.values[1] := IsObject(k) ? "Object(" (&k) ")" : k
-            child.container := container
-            nodes.Push(child)
-        }
-        return nodes
-    }
-    
-    expandable {
-        get {
-            return IsObject(this.values[2])
-        }
-    }
-    
-    GetValueString() {
-        value := this.values[2]
-        if IsObject(value) {
-            try if value.ToString
-                return value.ToString()
-            try if className := value.__Class
-                return className
-            return "Object"
-        }
-        return value
-    }
-    
-    SetValue(value, c) {
-        if (c = 2) {
-            ; Update the actual value
-            this.container[this.key] := value
-        }
-        ; Update our copy of the value
-        this.values[c] := value
-    }
+    return value
 }

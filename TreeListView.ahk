@@ -315,20 +315,17 @@ class TreeListView extends TreeListView._Base
         this.EditRow := ""
         this.EditColumn := ""
         GuiControl Hide, % this.hEdit
-        if node.SetValue(value, c) != 0 {
-            LV_Modify(r, "Col" c, value)
-            if (!node.expandable && node.children) { ; FIXME: This doesn't belong here
-                ; Since value is a string, node can't be expanded
-                LV_Modify(r, "Icon1 Col" c)
-                this.RemoveChildren(r+1, node)
-                node.children := ""
-                node.expanded := false
-            }
-        }
+        this.SetNodeValue(node, c, value)
         GuiControl +Redraw, % this.hLV
     }
     IsEditing() {
         return DllCall("IsWindowVisible", "ptr", this.hEdit)
+    }
+    
+    SetNodeValue(node, column, value) {
+        value := node.values[column] := value
+        if r := this.RowFromNode(node)
+            LV_Modify(r, "Col" column, value)
     }
     
     ;}
