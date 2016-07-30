@@ -6,7 +6,7 @@
         tlv := new TreeListView(RootNode [, Options, Headers, GuiName])
         tlv.root
         tlv.ScrollPos
-        tlv.FocusedItem
+        tlv.FocusedNode
         tlv.Reset()
         tlv.EnableRedraw(enable)
 */
@@ -479,7 +479,7 @@ class TreeListView extends TreeListView._Base
         }
     }
     
-    FocusedItem {
+    FocusedNode {
         get {
             restore_gui_on_return := this.LV_BeginScope()
             return (r := LV_GetNext(,"F")) ? this.NodeFromRow(r) : ""
