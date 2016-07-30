@@ -101,7 +101,7 @@ class DebugVars extends TreeListView._Base
     ContextMenu(ctrlHwnd, eventInfo, isRightClick, x, y) {
         if (ctrlHwnd != this.TLV.hLV || !this.OnContextMenu)
             return
-        node := eventInfo ? this.TLV.LV_Data(eventInfo) : ""
+        node := eventInfo ? this.TLV.NodeFromRow(eventInfo) : ""
         this.OnContextMenu(node, isRightClick, x, y)
     }
 }
