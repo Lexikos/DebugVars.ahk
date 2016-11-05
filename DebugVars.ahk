@@ -83,15 +83,15 @@ class DebugVars extends TreeListView._Base
     
     Hide() {
         Gui % this.hGui ":Hide"
-        DebugVars.UnregisterHwnd(this.hGui)
+        this.UnregisterHwnd()
     }
     
     RegisterHwnd() {
         DebugVars.Instances[this.hGui] := this
     }
     
-    UnregisterHwnd(hwnd) {
-        DebugVars.Instances.Delete(hwnd)
+    UnregisterHwnd() {
+        DebugVars.Instances.Delete(this.hGui)
     }
     
     __Delete() {
@@ -107,7 +107,7 @@ class DebugVars extends TreeListView._Base
 }
 
 DebugVars_GuiClose(hwnd) {
-    DebugVars.UnregisterHwnd(hwnd)
+    DebugVars.Instances[hwnd].UnregisterHwnd()
 }
 
 DebugVars_GuiEscape(hwnd) {
