@@ -174,6 +174,7 @@ dv.Show()
   - `name`: This is shown in the window title.
   - `value`: The initial value.
   - `type`: The initial type, which can be one of the following strings: `undefined`, `string`, `integer`, `float`.
+  - `readonly`: If set to true, the value can't be changed.
 
 `Var` can be passed directly to the constructor instead of calling *SetVar*.
 
