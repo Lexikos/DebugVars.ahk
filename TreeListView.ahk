@@ -189,14 +189,18 @@ class TreeListView extends TreeListView._Base
         parent.children.InsertAt(i, child)
         child.level := (parent == this.root) ? 0 : parent.level + 1
         this.LinkNode(child)
-        if r
+        if r {
+            restore_gui_on_return := this.LV_BeginScope()
             this.InsertRow(r, child)
+        }
     }
     RemoveChild(parent, i) {
         if !(child := parent.children.RemoveAt(i))
             throw Exception("No child at index " i, -1)
-        if (r := this.RowFromNode(child))
+        if (r := this.RowFromNode(child)) {
+            restore_gui_on_return := this.LV_BeginScope()
             this.RemoveRow(r)
+        }
         this.UnlinkNode(child)
     }
     
