@@ -20,9 +20,9 @@ class DebugVars extends TreeListView._Base
         Gui New, hwndhGui LabelDebugVars_Gui +Resize
         this.hGui := hGui
         Gui Margin, 0, 0
-        this.TLV := new this.Control(RootNode
-            , "w500 h300 -LV0x10 -Multi", "Name|Value") ; LV0x10 = LVS_EX_HEADERDRAGDROP
         Gui -DPIScale
+        this.TLV := new this.Control(RootNode
+            , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " -LV0x10 -Multi", "Name|Value") ; LV0x10 = LVS_EX_HEADERDRAGDROP
     }
     
     class Control extends TreeListView
@@ -37,7 +37,7 @@ class DebugVars extends TreeListView._Base
         }
         
         AfterPopulate() {
-            LV_ModifyCol(this.COL_NAME, 150)
+            LV_ModifyCol(this.COL_NAME, 150*(A_ScreenDPI/96))
             this.AutoSizeValueColumn()
         }
         
