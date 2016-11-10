@@ -517,14 +517,15 @@ class TreeListView extends TreeListView._Base
             this.ExpandContract(r)
             return true
         }
+        if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.OnDoubleClick) {
+            if node := this.NodeFromRow(r)
+                this.OnDoubleClick(node)
+            return true
+        }
         if (where = LVHT_ONITEMLABEL && LV_GetNext(r-1) == r) { ; Was already selected.
             c := NumGet(hti, 16, "int") + 1
             this.BeginEdit(r, c)
             return true
-        }
-        if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.OnDoubleClick) {
-            if node := this.NodeFromRow(r)
-                this.OnDoubleClick(node)
         }
     }
     

@@ -89,6 +89,18 @@ TreeListView.HwndFrom[hwnd]
 
 This can be used to find a TreeListView instance given the HWND of its ListView, Edit, or ListView header control.
 
+## Callbacks
+
+```
+tlv.OnDoubleClick := Func("MyDoubleClick")
+
+MyDoubleClick(tlv, node) {
+  ...
+}
+```
+
+*OnDoubleClick* is called when a node is double-clicked.  If not defined, the standard single-click action occurs.
+
 ## Object Lifetime
 
 TreeListView instances are not fully deleted until after the GUI is destroyed and all other references to the object are released.

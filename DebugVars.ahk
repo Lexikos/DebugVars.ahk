@@ -10,6 +10,7 @@
         dv.Show()
         dv.Hide()
         dv.OnContextMenu := Func(dv, node, isRightClick, x, y)
+        dv.OnDoubleClick := Func(dv, node)
 */
 class DebugVars extends TreeListView._Base
 {
@@ -73,6 +74,11 @@ class DebugVars extends TreeListView._Base
                 node.children := ""
                 node.expanded := false
             }
+        }
+        
+        OnDoubleClick(node) {
+            if (dv := DebugVars.Instances[this.hGui]) && dv.OnDoubleClick
+                dv.OnDoubleClick(node)
         }
     }
     
