@@ -26,33 +26,8 @@ CloseAll(exitReason:="") {
     ExitApp
 }
 
-dv := DV_Create(new DcAllScriptsNode)
+dv := new DcDebugVars(new DcAllScriptsNode)
 dv.Show()
-dv := ""
-
-DV_Create(root) {
-    ; global scitehwnd
-    dv := new DcDebugVars(root)
-    dv.OnContextMenu := Func("DV_ContextMenu")
-    dv.OnDoubleClick := Func("DV_EditNode")
-    ; Gui % dv.hGui ":+ToolWindow +Owner" scitehwnd
-    WinSetTitle % "ahk_id " dv.hGui,, % root.GetWindowTitle()
-    return dv
-}
-
-DV_ContextMenu(dv, node, isRightClick, x, y) {
-    if node.base != DcPropertyNode
-        return ; TODO: "Open in new window" for DcScriptNode/DcContextNode
-    fn := Func("DV_EditNode").Bind(dv, node)
-    try Menu DV_Menu, DeleteAll  ; In case we're interrupting a prior call.
-    Menu DV_Menu, Add, Inspect, % fn
-    Menu DV_Menu, Show, % x, % y
-    try Menu DV_Menu, Delete
-}
-
-DV_EditNode(dv, node) {
-    InspectProperty(node.dbg, node.xml.getAttribute("fullname"))
-}
 
 InspectProperty(dbg, fullname, extra_args:="") {
     ; SetEnableChildren(true)
@@ -75,7 +50,7 @@ InspectProperty(dbg, fullname, extra_args:="") {
         value := DBGp_Base64UTF8Decode(prop.text)
         VE_Create(dbg, fullname, value, type, isReadOnly)
     } else {
-        dv := DV_Create(new DcPropertyNode(dbg, prop))
+        dv := new DcDebugVars(new DcPropertyNode(dbg, prop))
         dv.Show()
     }
 }
@@ -109,6 +84,12 @@ class DcNodeBase extends TreeListView._Base
     
     SetValue(value) {
         return false
+    }
+    
+    Clone() {
+        node := ObjClone(this)
+        node.children := this.GetChildren()
+        return node
     }
 }
 
@@ -168,6 +149,10 @@ class DcScriptNode extends DcNodeBase
             Sleep 15
         }
         return [new DcContextNode(this.dbg, 0), new DcContextNode(this.dbg, 1)]
+    }
+    
+    GetWindowTitle() {
+        return format("Variables - {} (0x{:x})", this.values[1], this.hwnd)
     }
 }
 
@@ -311,10 +296,17 @@ DebugEnd(session) {
 
 class DcDebugVars extends DebugVars
 {
+    Show(options:="", title:="") {
+        return base.Show(options
+            , title != "" ? title : this.TLV.root.GetWindowTitle())
+    }
+    
     UnregisterHwnd() {
         base.UnregisterHwnd()
-        DetachAll()
-        ExitApp
+        if !this.Instances.MaxIndex() {
+            DetachAll()
+            ExitApp
+        }
     }
     
     class Control extends DebugVars.Control {
@@ -324,6 +316,35 @@ class DcDebugVars extends DebugVars
                 return true
             }
         }
+    }
+    
+    OnContextMenu(node, isRightClick, x, y) {
+        try Menu DV_Menu, DeleteAll  ; In case we're interrupting a prior call.
+        if node.base != DcPropertyNode {
+            fn := ObjBindMethod(this, "NewWindow", node)
+            Menu DV_Menu, Add, New Window, % fn
+        } else {
+            fn := ObjBindMethod(this, "InspectNode", node)
+            Menu DV_Menu, Add, Inspect, % fn
+        }
+        Menu DV_Menu, Show, % x, % y
+        try Menu DV_Menu, Delete
+    }
+    
+    OnDoubleClick(node) {
+        if node.base != DcPropertyNode
+            this.NewWindow(node)
+        else
+            this.InspectNode(node)
+    }
+    
+    InspectNode(node) {
+        InspectProperty(node.dbg, node.xml.getAttribute("fullname"))
+    }
+    
+    NewWindow(node) {
+        dv := new this.base(node.Clone())
+        dv.Show()
     }
 }
 
