@@ -293,19 +293,15 @@ class DcPropertyNode extends DcPropertyParentNode
         return title
     }
     
-    SetValue(value) {
+    SetValue(ByRef value) {
         this.dbg.property_set("-n " this.xml.getAttribute("fullname")
             . " -- " DBGp_Base64UTF8Encode(value), response)
         if InStr(response, "<error") || InStr(response, "success=""0""")
             return false
         ; Update .xml for @classname and @children, and in case the value
         ; differs from what we set (e.g. for setting A_KeyDelay in v2).
-        this.dbg.property_get("-n " this.xml.getAttribute("fullname"), response)
-        if InStr(response, "<error")
-            return false
-        this.xml := DcLoadXml(response).selectSingleNode("/response/property")
-        this.value := DBGp_Base64UTF8Decode(this.xml.text)
-        return true
+        this.GetProperty()
+        this.value := value := DBGp_Base64UTF8Decode(this.xml.text)
     }
     
     Update(tlv, prop:="") {
