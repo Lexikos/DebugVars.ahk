@@ -19,52 +19,53 @@ test_vars := "
 test_obj := {}
 Loop Parse, % test_vars, `n
     test_obj[A_LoopField] := %A_LoopField%
-dv := new DebugVars(new DvObjectNode(test_obj))
-dv.OnContextMenu := Func("DV_ContextMenu")
-dv.OnDoubleClick := Func("DV_EditNode")
-dv.Show(), dv := ""
-while DebugVars.Instances.Length()
+vtg := new VarTreeGui(new VarTreeObjectNode(test_obj))
+vtg.OnContextMenu := Func("ContextMenu")
+vtg.OnDoubleClick := Func("EditNode")
+vtg.Show(), vtg := ""
+while VarTreeGui.Instances.Length()
     Sleep 1000
 ExitApp
 
-DV_ContextMenu(dv, node, isRightClick, x, y) {
-    fn := Func("DV_EditNode").Bind(dv, node)
+ContextMenu(vtg, node, isRightClick, x, y) {
+    try Menu OEmenu, DeleteAll
+    fn := Func("EditNode").Bind(vtg, node)
     Menu OEmenu, Add, Inspect, % fn
     Menu OEmenu, Show, % x, % y
-    Menu OEmenu, Delete
+    try Menu OEmenu, Delete
 }
 
-DV_EditNode(dv, node) {
+EditNode(vtg, node) {
     if IsObject(node.value) {
-        dv := new DebugVars(new DvObjectNode(node.value))
-        dv.Show()
-        return
+        gui := new VarTreeGui(new VarTreeObjectNode(node.value))
     }
-    ed := new DebugVar({name: node.name, value: node.value, type: dv_type(node.value)})
-    ed.OnSave := Func("ED_Save").Bind(dv, node)
-    ed.Show()
+    else {
+        gui := new VarEditGui({name: node.name, value: node.value, type: vt_type(node.value)})
+        gui.OnSave := Func("ED_Save").Bind(vtg, node)
+    }
+    gui.Show()
 }
 
-ED_Save(dv, node, ed, value, type) {
+ED_Save(vtg, node, ed, value, type) {
     if (type = "integer")
         value += 0
     else if (type = "float")
         value += 0.0
     node.SetValue(value)
-    dv.EnableRedraw(false)
-    dv.Reset()
-    dv.EnableRedraw(true)
+    vtg.EnableRedraw(false)
+    vtg.Reset()
+    vtg.EnableRedraw(true)
     ed.Var.value := value
     ed.Var.type := type
 }
 
 ; https://autohotkey.com/boards/viewtopic.php?t=2306
-dv_type(v) {
+vt_type(v) {
     if IsObject(v)
         return "Object"
     return v="" || [v].GetCapacity(1) ? "string" : InStr(v,".") ? "float" : "integer"
 }
 
-#Include DebugVars.ahk
-#Include DebugVars.ObjectNode.ahk
-#Include DebugVar.ahk
+#Include VarTreeGui.ahk
+#Include VarTreeObjectNode.ahk
+#Include VarEditGui.ahk

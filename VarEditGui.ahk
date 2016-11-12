@@ -1,18 +1,18 @@
 ﻿
 /*
-    DebugVars
+    VarEditGui
     
     Public interface:
-        dv := new DebugVar({Name, Value, Type})
-        dv.SetVar({Name, Value, Type})
-        dv.Show()
-        dv.Cancel()
-        dv.Hide()
-        dv.OnSave := Func(dv, value, type)
-        dv.OnDirty := Func(dv)
-        dv.OnCancel := Func(dv)
+        ed := new VarEditGui({Name, Value, Type, ReadOnly})
+        ed.SetVar({Name, Value, Type, ReadOnly)
+        ed.Show()
+        ed.Cancel()
+        ed.Hide()
+        ed.OnSave := Func(ed, value, type)
+        ed.OnDirty := Func(ed)
+        ed.OnCancel := Func(ed)
 */
-class DebugVar {
+class VarEditGui {
     __New(aVar:="") {
         editOpt := ""
         if aVar && (aVar.type = "integer" || aVar.type = "float")
@@ -36,9 +36,9 @@ class DebugVar {
         else {
             ; 'undefined' can't be set by the user, but may be the initial type
             types := (type = "undefined" ? "|undefined" : "") "|string"
-            if DebugVar_isInt64(value)
+            if VarEditGui_isInt64(value)
                 types .= "|integer" (InStr(value,"0x") ? "" : "|float")
-            else if DebugVar_isFloat(value)
+            else if VarEditGui_isFloat(value)
                 types .= "|float"
         }
         GuiControl,, % this.hType, % types
@@ -47,10 +47,10 @@ class DebugVar {
         
         GuiControl % (readonly ? "+" : "-") "ReadOnly", % this.hEdit
         
-        OnMessage(0x111, Func("DebugVar_Suppress"), 1)
+        OnMessage(0x111, Func("VarEditGui_Suppress"), 1)
         GuiControl,, % this.hEdit, % value
         Sleep -1
-        OnMessage(0x111, Func("DebugVar_Suppress"), 0)
+        OnMessage(0x111, Func("VarEditGui_Suppress"), 0)
         
         GuiControl,, % InStr(value,"`r`n") ? this.hCRLF : this.hLF, 1
         this.DisEnableEOLControls(value, readonly)
@@ -60,7 +60,7 @@ class DebugVar {
     }
     
     CreateGui(editOpt:="") {
-        Gui New, hwndhGui LabelDebugVar_Gui +Resize
+        Gui New, hwndhGui LabelVarEditGui_On +Resize
         
         Gui Add, Edit, hwndhEdit w300 r10 %editOpt%
         fn := this.ChangeValue.Bind(this)
@@ -99,7 +99,7 @@ class DebugVar {
     }
     
     Show(options:="") {
-        DebugVar.Instances[this.hGui] := this
+        VarEditGui.Instances[this.hGui] := this
         Gui % this.hGui ":Show", % options
     }
     
@@ -112,7 +112,7 @@ class DebugVar {
     
     Hide() {
         Gui % this.hGui ":Hide"
-        DebugVar.RevokeHwnd(this.hGui)
+        VarEditGui.RevokeHwnd(this.hGui)
     }
     
     RevokeHwnd(hwnd) {
@@ -182,7 +182,7 @@ class DebugVar {
     
     ChangeValue() {
         GuiControlGet value,, % this.hEdit
-        if (value = "" || !DebugVar_isFloat(value) && !DebugVar_isInt64(value)) {
+        if (value = "" || !VarEditGui_isFloat(value) && !VarEditGui_isInt64(value)) {
             ; Only 'string' is valid for this value
             GuiControl,, % this.hType, |string||
         }
@@ -219,7 +219,7 @@ class DebugVar {
     }
 }
 
-DebugVar_isInt64(s) {
+VarEditGui_isInt64(s) {
     ; Unlike (s+0 != ""), this detects overflow and rules out floating-point.
     NumPut(0, DllCall("msvcrt\_errno", "ptr"), "int")
 	if A_IsUnicode
@@ -230,24 +230,24 @@ DebugVar_isInt64(s) {
 		&& StrGet(endp) = "" && s != ""
 }
 
-DebugVar_isFloat(s) {
+VarEditGui_isFloat(s) {
     if s is float
         return s
     return false
 }
 
-DebugVar_GuiClose(hwnd) {
-    DebugVar.RevokeHwnd(hwnd)
+VarEditGui_OnClose(hwnd) {
+    VarEditGui.RevokeHwnd(hwnd)
 }
 
-DebugVar_GuiEscape(hwnd) {
-    DebugVar.Instances[hwnd].Cancel()
+VarEditGui_OnEscape(hwnd) {
+    VarEditGui.Instances[hwnd].Cancel()
 }
 
-DebugVar_GuiSize(hwnd, e, w, h) {
-    DebugVar.Instances[hwnd].GuiSize(w, h)
+VarEditGui_OnSize(hwnd, e, w, h) {
+    VarEditGui.Instances[hwnd].GuiSize(w, h)
 }
 
-DebugVar_Suppress() {
+VarEditGui_Suppress() {
     return 0
 }

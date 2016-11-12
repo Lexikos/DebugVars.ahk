@@ -2,23 +2,23 @@
 #Include TreeListView.ahk
 
 /*
-    DebugVars
+    VarTreeGui
     
     Public interface:
-        dv := new DebugVars(RootNode)
-        dv.TLV
-        dv.Show()
-        dv.Hide()
-        dv.OnContextMenu := Func(dv, node, isRightClick, x, y)
-        dv.OnDoubleClick := Func(dv, node)
+        vtg := new VarTreeGui(RootNode)
+        vtg.TLV
+        vtg.Show()
+        vtg.Hide()
+        vtg.OnContextMenu := Func(vtg, node, isRightClick, x, y)
+        vtg.OnDoubleClick := Func(vtg, node)
 */
-class DebugVars extends TreeListView._Base
+class VarTreeGui extends TreeListView._Base
 {
     static Instances := {} ; Hwnd:Object map of *visible* instances
     
     __New(RootNode) {
         restore_gui_on_return := new TreeListView.GuiScope()
-        Gui New, hwndhGui LabelDebugVars_Gui +Resize
+        Gui New, hwndhGui LabelVarTreeGui +Resize
         this.hGui := hGui
         Gui Margin, 0, 0
         Gui -DPIScale
@@ -79,8 +79,8 @@ class DebugVars extends TreeListView._Base
         }
         
         OnDoubleClick(node) {
-            if (dv := DebugVars.Instances[this.hGui]) && dv.OnDoubleClick
-                dv.OnDoubleClick(node)
+            if (vtg := VarTreeGui.Instances[this.hGui]) && vtg.OnDoubleClick
+                vtg.OnDoubleClick(node)
         }
     }
     
@@ -95,11 +95,11 @@ class DebugVars extends TreeListView._Base
     }
     
     RegisterHwnd() {
-        DebugVars.Instances[this.hGui] := this
+        VarTreeGui.Instances[this.hGui] := this
     }
     
     UnregisterHwnd() {
-        DebugVars.Instances.Delete(this.hGui)
+        VarTreeGui.Instances.Delete(this.hGui)
     }
     
     __Delete() {
@@ -114,19 +114,19 @@ class DebugVars extends TreeListView._Base
     }
 }
 
-DebugVars_GuiClose(hwnd) {
-    DebugVars.Instances[hwnd].UnregisterHwnd()
+VarTreeGuiClose(hwnd) {
+    VarTreeGui.Instances[hwnd].UnregisterHwnd()
 }
 
-DebugVars_GuiEscape(hwnd) {
-    DebugVars.Instances[hwnd].Hide()
+VarTreeGuiEscape(hwnd) {
+    VarTreeGui.Instances[hwnd].Hide()
 }
 
-DebugVars_GuiSize(hwnd, e, w, h) {
+VarTreeGuiSize(hwnd, e, w, h) {
     GuiControl Move, SysListView321, w%w% h%h%
-    DebugVars.Instances[hwnd].TLV.AutoSizeValueColumn()
+    VarTreeGui.Instances[hwnd].TLV.AutoSizeValueColumn()
 }
 
-DebugVars_GuiContextMenu(hwnd, prms*) {
-    DebugVars.Instances[hwnd].ContextMenu(prms*)
+VarTreeGuiContextMenu(hwnd, prms*) {
+    VarTreeGui.Instances[hwnd].ContextMenu(prms*)
 }

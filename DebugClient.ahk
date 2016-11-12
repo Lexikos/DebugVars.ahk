@@ -1,6 +1,6 @@
 ﻿
-#Include DebugVars.ahk
-#Include DebugVar.ahk
+#Include VarTreeGui.ahk
+#Include VarEditGui.ahk
 
 global ShortValueLimit := 64
 
@@ -26,7 +26,7 @@ CloseAll(exitReason:="") {
     ExitApp
 }
 
-dv := new DcDebugVars(new DcAllScriptsNode)
+dv := new DebugVarsGui(new DvAllScriptsNode)
 dv.Show()
 
 InspectProperty(dbg, fullname, extra_args:="") {
@@ -35,7 +35,7 @@ InspectProperty(dbg, fullname, extra_args:="") {
     ; according to the spec) doesn't work with v1.1.24.02 and earlier.
     dbg.property_get("-m 1048576 -n " fullname (extra_args="" ? "" : " " extra_args), response)
     dbg.feature_set("-n max_depth -v 0")
-    prop := DcLoadXml(response).selectSingleNode("/response/property")
+    prop := DvLoadXml(response).selectSingleNode("/response/property")
     
     if (prop.getAttribute("name") = "(invalid)") {
         MsgBox, 48,, Invalid variable name: %fullname%
@@ -46,14 +46,14 @@ InspectProperty(dbg, fullname, extra_args:="") {
     if (type != "object") {
         isReadOnly := prop.getAttribute("facet") = "Builtin"
         value := DBGp_Base64UTF8Decode(prop.text)
-        dv := new DcDebugVar(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
+        dv := new DebugVarGui(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
     } else {
-        dv := new DcDebugVars(new DcPropertyNode(dbg, prop))
+        dv := new DebugVarsGui(new DvPropertyNode(dbg, prop))
     }
     dv.Show()
 }
 
-class DcDebugVar extends DebugVar
+class DebugVarGui extends VarEditGui
 {
     __New(dbg, var) {
         base.__New(var)
@@ -72,7 +72,7 @@ class DcDebugVar extends DebugVar
     }
 }
 
-class DcNodeBase extends TreeListView._Base
+class DvNodeBase extends TreeListView._Base
 {
     expanded {
         set {
@@ -104,12 +104,12 @@ class DcNodeBase extends TreeListView._Base
     }
 }
 
-class DcAllScriptsNode extends DcNodeBase
+class DvAllScriptsNode extends DvNodeBase
 {
     GetChildren() {
         children := []
         for i, script_id in this.GetScripts()
-            children.Push(new DcScriptNode(script_id))
+            children.Push(new DvScriptNode(script_id))
         return children
     }
     
@@ -149,13 +149,13 @@ class DcAllScriptsNode extends DcNodeBase
             tlv.RemoveChild(this, nc)
         }
         for ns, script_id in new_scripts {
-            tlv.InsertChild(this, nc++, new DcScriptNode(script_id))
+            tlv.InsertChild(this, nc++, new DvScriptNode(script_id))
         }
         base.Update(tlv)
     }
 }
 
-class DcScriptNode extends DcNodeBase
+class DvScriptNode extends DvNodeBase
 {
     static expandable := true
     
@@ -184,7 +184,7 @@ class DcScriptNode extends DcNodeBase
             }
             Sleep 15
         }
-        return [new DcContextNode(this.dbg, 0), new DcContextNode(this.dbg, 1)]
+        return [new DvContextNode(this.dbg, 0), new DvContextNode(this.dbg, 1)]
     }
     
     GetWindowTitle() {
@@ -192,7 +192,7 @@ class DcScriptNode extends DcNodeBase
     }
 }
 
-class DcPropertyParentNode extends DcNodeBase
+class DvPropertyParentNode extends DvNodeBase
 {
     UpdateChildren(tlv, props) {
         children := this.children
@@ -206,7 +206,7 @@ class DcPropertyParentNode extends DcNodeBase
             if (np < props.length) {
                 prop := props.item(np)
                 if (nc > children.Length() || prop.getAttribute("name") < children[nc].name) {
-                    tlv.InsertChild(this, nc, new DcPropertyNode(this.dbg, prop))
+                    tlv.InsertChild(this, nc, new DvPropertyNode(this.dbg, prop))
                     ++nc, ++np
                     continue
                 }
@@ -223,7 +223,7 @@ class DcPropertyParentNode extends DcNodeBase
     }
 }
 
-class DcPropertyNode extends DcPropertyParentNode
+class DvPropertyNode extends DvPropertyParentNode
 {
     __new(dbg, prop) {
         this.dbg := dbg
@@ -252,7 +252,7 @@ class DcPropertyNode extends DcPropertyParentNode
     FromXmlNodes(props, dbg) {
         nodes := []
         for prop in props
-            nodes.Push(new DcPropertyNode(dbg, prop))
+            nodes.Push(new DvPropertyNode(dbg, prop))
         return nodes
     }
     
@@ -268,14 +268,14 @@ class DcPropertyNode extends DcPropertyParentNode
         this.dbg.property_get("-n " this.fullname, response)
         this.dbg.feature_set("-n max_depth -v 0")
         ; SetEnableChildren(false) ; SciTE
-        xml := DcLoadXml(response) ; SciTE
+        xml := DvLoadXml(response) ; SciTE
         return this.xml := xml.selectSingleNode("/response/property")
     }
     
     GetChildren() {
         prop := this.GetProperty()
         props := prop.selectNodes("property")
-        return DcPropertyNode.FromXmlNodes(props, this.dbg)
+        return DvPropertyNode.FromXmlNodes(props, this.dbg)
     }
     
     GetValueString() {
@@ -318,7 +318,7 @@ class DcPropertyNode extends DcPropertyParentNode
     }
 }
 
-class DcContextNode extends DcPropertyParentNode
+class DvContextNode extends DvPropertyParentNode
 {
     static expandable := true
     
@@ -335,13 +335,13 @@ class DcContextNode extends DcPropertyParentNode
     
     GetProperties() {
         this.dbg.context_get("-c " this.context, response)
-        xml := DcLoadXml(response)
+        xml := DvLoadXml(response)
         return xml.selectNodes("/response/property")
     }
     
     GetChildren() {
         props := this.GetProperties()
-        return DcPropertyNode.FromXmlNodes(props, this.dbg)
+        return DvPropertyNode.FromXmlNodes(props, this.dbg)
     }
     
     GetWindowTitle() {
@@ -360,7 +360,7 @@ DebugBegin(dbg, initPacket) {
     dbg.feature_set("-n max_depth -v 0")
     dbg.feature_set("-n max_data -v " ShortValueLimit)
     dbg.feature_get("-n language_version", response)
-    dbg.version := RegExReplace(DcLoadXml(response).selectSingleNode("response").text, " .*")
+    dbg.version := RegExReplace(DvLoadXml(response).selectSingleNode("response").text, " .*")
     dbg.no_base64_numbers := dbg.version && dbg.version <= "1.1.24.02" ; Workaround.
     dbg.run()
     node.dbg := dbg
@@ -374,7 +374,7 @@ DebugBreak() {
 DebugEnd(dbg) {
     DbgSessions.Delete(dbg.thread)
     close := []
-    for hwnd, dv in DebugVars.Instances {
+    for hwnd, dv in VarTreeGui.Instances {
         tlv := dv.TLV, root := tlv.root
         if (dbg == root.dbg) {
             close.Push(dv)
@@ -392,7 +392,7 @@ DebugEnd(dbg) {
         dv.Hide()
 }
 
-class DcDebugVars extends DebugVars
+class DebugVarsGui extends VarTreeGui
 {
     Show(options:="", title:="") {
         return base.Show(options
@@ -408,7 +408,7 @@ class DcDebugVars extends DebugVars
         }
     }
     
-    class Control extends DebugVars.Control {
+    class Control extends VarTreeGui.Control {
         LV_Key_F5() {
             this.root.Update(this)
         }
@@ -416,7 +416,7 @@ class DcDebugVars extends DebugVars
     
     OnContextMenu(node, isRightClick, x, y) {
         try Menu DC_Menu, DeleteAll  ; In case we're interrupting a prior call.
-        if node.base != DcPropertyNode
+        if node.base != DvPropertyNode
             Menu DC_Menu, Add, New window, DC_CM_NewWindow
         else
             Menu DC_Menu, Add, Inspect, DC_CM_InspectNode
@@ -445,7 +445,7 @@ class DcDebugVars extends DebugVars
     }
     
     OnDoubleClick(node) {
-        if node.base != DcPropertyNode
+        if node.base != DvPropertyNode
             this.NewWindow(node)
         else
             this.InspectNode(node)
@@ -482,7 +482,7 @@ class DcDebugVars extends DebugVars
 }
 
 RefreshAll() {
-    for hwnd, dv in DebugVars.Instances
+    for hwnd, dv in VarTreeGui.Instances
         dv.Refresh()
 }
 
@@ -491,7 +491,7 @@ DetachAll() {
         session.detach(), session.Close()
 }
 
-DcLoadXml(ByRef data) {
+DvLoadXml(ByRef data) {
     o := ComObjCreate("MSXML2.DOMDocument")
     o.async := false
     o.setProperty("SelectionLanguage", "XPath")

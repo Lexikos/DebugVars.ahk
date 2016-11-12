@@ -1,5 +1,5 @@
 
-class DvObjectNode extends TreeListView._Base
+class VarTreeObjectNode extends TreeListView._Base
 {
     __new(value, name:="") {
         this.value := value
@@ -22,7 +22,7 @@ class DvObjectNode extends TreeListView._Base
     _MakeChildren() {
         children := []
         for k,v in this.value {
-            child := new DvObjectNode(v, this._GetValueString(k))
+            child := new VarTreeObjectNode(v, this._GetValueString(k))
             child.key := k
             child.container := this.value
             children.Push(child)
