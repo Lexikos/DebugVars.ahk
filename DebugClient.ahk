@@ -68,6 +68,7 @@ class DcDebugVar extends DebugVar
         this.dbg.property_set("-n " this.var.name " -t " type " -- " data)
         this.var.value := value
         this.var.type := type
+        RefreshAll()
     }
 }
 
@@ -482,6 +483,11 @@ class DcDebugVars extends DebugVars
     Refresh() {
         this.TLV.root.Update(this.TLV)
     }
+}
+
+RefreshAll() {
+    for hwnd, dv in DebugVars.Instances
+        dv.Refresh()
 }
 
 DetachAll() {
