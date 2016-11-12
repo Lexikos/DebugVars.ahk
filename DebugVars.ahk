@@ -23,7 +23,7 @@ class DebugVars extends TreeListView._Base
         Gui Margin, 0, 0
         Gui -DPIScale
         this.TLV := new this.Control(RootNode
-            , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " -LV0x10 -Multi", "Name|Value") ; LV0x10 = LVS_EX_HEADERDRAGDROP
+            , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " LV0x10000 -LV0x10 -Multi", "Name|Value") ; LV0x10 = LVS_EX_HEADERDRAGDROP
     }
     
     class Control extends TreeListView
