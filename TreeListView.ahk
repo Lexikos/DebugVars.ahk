@@ -321,6 +321,14 @@ class TreeListView extends TreeListView._Base
             LV_Modify(r, "Col" column, value)
     }
     
+    RefreshValues(node) {
+        if r := this.RowFromNode(node) {
+            restore_gui_on_return := this.LV_BeginScope()
+            opt := "Icon" (node.expandable ? (node.expanded ? 3 : 2) : 1)
+            LV_Modify(r, opt, node.values*)
+        }
+    }
+    
     ;}
     
     ;{ Keyboard Handling

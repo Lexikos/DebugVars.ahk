@@ -30,14 +30,12 @@ dv := new DcDebugVars(new DcAllScriptsNode)
 dv.Show()
 
 InspectProperty(dbg, fullname, extra_args:="") {
-    ; SetEnableChildren(true)
     dbg.feature_set("-n max_depth -v 1")
-    ; 1MB seems reasonably permissive.  Note that -m 0 (unlimited according
-    ; to the spec) doesn't work with v1.1.24.02 and earlier.
+    ; 1MB seems reasonably permissive.  Note that -m 0 (unlimited
+    ; according to the spec) doesn't work with v1.1.24.02 and earlier.
     dbg.property_get("-m 1048576 -n " fullname (extra_args="" ? "" : " " extra_args), response)
     dbg.feature_set("-n max_depth -v 0")
-    ; SetEnableChildren(false)
-    prop := loadXML(response).selectSingleNode("/response/property")
+    prop := DcLoadXml(response).selectSingleNode("/response/property")
     
     if (prop.getAttribute("name") = "(invalid)") {
         MsgBox, 48,, Invalid variable name: %fullname%
@@ -48,22 +46,29 @@ InspectProperty(dbg, fullname, extra_args:="") {
     if (type != "object") {
         isReadOnly := prop.getAttribute("facet") = "Builtin"
         value := DBGp_Base64UTF8Decode(prop.text)
-        VE_Create(dbg, fullname, value, type, isReadOnly)
+        dv := new DcDebugVar(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
     } else {
         dv := new DcDebugVars(new DcPropertyNode(dbg, prop))
-        dv.Show()
     }
-}
-
-VE_Create(dbg, name, ByRef value, type, isReadOnly) {
-    dv := new DebugVar({name: name, value: value, type: type, readonly: isReadOnly})
-    dv.dbg := dbg
-    dv.OnSave := Func("VE_Save")
     dv.Show()
 }
 
-VE_Save(dv, ByRef value, type) {
-    dv.dbg.property_set("-n " dv.var.name " -t " type " -- " DBGp_Base64UTF8Encode(value))
+class DcDebugVar extends DebugVar
+{
+    __New(dbg, var) {
+        base.__New(var)
+        this.dbg := dbg
+    }
+    
+    OnSave(value, type) {
+        if (type = "integer" || type = "float") && this.dbg.no_base64_numbers
+            data := value
+        else
+            data := DBGp_Base64UTF8Encode(value)
+        this.dbg.property_set("-n " this.var.name " -t " type " -- " data)
+        this.var.value := value
+        this.var.type := type
+    }
 }
 
 class DcNodeBase extends TreeListView._Base
@@ -91,15 +96,25 @@ class DcNodeBase extends TreeListView._Base
         node.children := this.GetChildren()
         return node
     }
+    
+    Update(tlv) {
+        for i, child in this.children
+            child.Update(tlv)
+    }
 }
 
 class DcAllScriptsNode extends DcNodeBase
 {
-    static fullname := "*"
-    
     GetChildren() {
-        DetectHiddenWindows On
         children := []
+        for i, script_id in this.GetScripts()
+            children.Push(new DcScriptNode(script_id))
+        return children
+    }
+    
+    GetScripts() {
+        DetectHiddenWindows On
+        script_ids := []
         WinGet scripts, List, ahk_class AutoHotkey
         loop % scripts {
             script_id := scripts%A_Index%
@@ -108,13 +123,34 @@ class DcAllScriptsNode extends DcNodeBase
             PostMessage 0x44, 0, 0,, ahk_id %script_id%  ; WM_COMMNOTIFY, WM_NULL
             if ErrorLevel  ; Likely blocked by UIPI (won't be able to attach).
                 continue
-            children.Push(new DcScriptNode(script_id))
+            script_ids.Push(script_id)
         }
-        return children
+        return script_ids
     }
     
     GetWindowTitle() {
         return "Variables"
+    }
+    
+    Update(tlv) {
+        nc := 1
+        new_scripts := this.GetScripts()
+        children := this.children
+        while nc <= children.Length() {
+            node := children[nc]
+            ns := 0
+            while ++ns <= new_scripts.Length() {
+                if (new_scripts[ns] == node.hwnd) {
+                    new_scripts.RemoveAt(ns), ++nc
+                    continue 2
+                }
+            }
+            tlv.RemoveChild(this, nc)
+        }
+        for ns, script_id in new_scripts {
+            tlv.InsertChild(this, nc++, new DcScriptNode(script_id))
+        }
+        base.Update(tlv)
     }
 }
 
@@ -128,13 +164,12 @@ class DcScriptNode extends DcNodeBase
         title := RegExReplace(title, " - AutoHotkey v\S*$")
         SplitPath title, name, dir
         this.values := [name, hwnd "  -  " dir]
-        this.fullname := "script/" hwnd
     }
     
     GetChildren() {
         static attach_msg := DllCall("RegisterWindowMessage", "str", "AHK_ATTACH_DEBUGGER", "uint")
         thread_id := DllCall("GetWindowThreadProcessId", "ptr", this.hwnd, "ptr", 0, "uint")
-        if !this.dbg := DbgSessions[thread_id] { ; hackfix for DV_Update
+        if !this.dbg := DbgSessions[thread_id] {
             PendingThreads[thread_id] := this
             PostMessage % attach_msg,,,, % "ahk_id " this.hwnd
             began := A_TickCount
@@ -156,7 +191,38 @@ class DcScriptNode extends DcNodeBase
     }
 }
 
-class DcPropertyNode extends DcNodeBase
+class DcPropertyParentNode extends DcNodeBase
+{
+    UpdateChildren(tlv, props) {
+        children := this.children
+        if !children {
+            if !props.length
+                return
+            this.children := children := []
+        }
+        np := 0, nc := 1
+        loop {
+            if (np < props.length) {
+                prop := props.item(np)
+                if (nc > children.Length() || prop.getAttribute("name") < children[nc].name) {
+                    tlv.InsertChild(this, nc, new DcPropertyNode(this.dbg, prop))
+                    ++nc, ++np
+                    continue
+                }
+                if (prop.getAttribute("name") = children[nc].name) {
+                    children[nc].Update(tlv, prop)
+                    ++nc, ++np
+                    continue
+                }
+            }
+            if (nc > children.Length())
+                break
+            tlv.RemoveChild(this, nc)
+        }
+    }
+}
+
+class DcPropertyNode extends DcPropertyParentNode
 {
     __new(dbg, prop) {
         this.dbg := dbg
@@ -195,14 +261,18 @@ class DcPropertyNode extends DcNodeBase
         }
     }
     
-    GetChildren() {
+    GetProperty() {
         ; SetEnableChildren(true) ; SciTE
         this.dbg.feature_set("-n max_depth -v 1")
         this.dbg.property_get("-n " this.fullname, response)
         this.dbg.feature_set("-n max_depth -v 0")
         ; SetEnableChildren(false) ; SciTE
-        xml := loadXML(response) ; SciTE
-        this.xml := prop := xml.selectSingleNode("/response/property")
+        xml := DcLoadXml(response) ; SciTE
+        return this.xml := xml.selectSingleNode("/response/property")
+    }
+    
+    GetChildren() {
+        prop := this.GetProperty()
         props := prop.selectNodes("property")
         return DcPropertyNode.FromXmlNodes(props, this.dbg)
     }
@@ -225,27 +295,39 @@ class DcPropertyNode extends DcNodeBase
     SetValue(value) {
         this.dbg.property_set("-n " this.xml.getAttribute("fullname")
             . " -- " DBGp_Base64UTF8Encode(value), response)
-        if (InStr(response, "<error"))
+        if InStr(response, "<error") || InStr(response, "success=""0""")
             return false
         ; Update .xml for @classname and @children, and in case the value
         ; differs from what we set (e.g. for setting A_KeyDelay in v2).
         this.dbg.property_get("-n " this.xml.getAttribute("fullname"), response)
-        if (InStr(response, "<error"))
+        if InStr(response, "<error")
             return false
-        this.xml := loadXML(response).selectSingleNode("/response/property")
+        this.xml := DcLoadXml(response).selectSingleNode("/response/property")
         this.value := DBGp_Base64UTF8Decode(this.xml.text)
         return true
     }
+    
+    Update(tlv, prop:="") {
+        if !prop || prop.getAttribute("children")
+            prop := this.GetProperty()
+        else
+            this.xml := prop
+        props := prop.selectNodes("property")
+        value2 := this.values[2]
+        this.value := props.length ? "" : DBGp_Base64UTF8Decode(prop.text)
+        if !(this.values[2] == value2) ; Prevent unnecessary redraw and flicker.
+            tlv.RefreshValues(this)
+        this.UpdateChildren(tlv, props)
+    }
 }
 
-class DcContextNode extends DcNodeBase
+class DcContextNode extends DcPropertyParentNode
 {
     static expandable := true
     
     __new(dbg, context) {
         this.dbg := dbg
         this.context := context
-        this.fullname := this.dbg.socket "/context/" context ; hackfix for DV_Update_Expand
     }
     
     values {
@@ -254,44 +336,63 @@ class DcContextNode extends DcNodeBase
         }
     }
     
-    GetChildren() {
+    GetProperties() {
         this.dbg.context_get("-c " this.context, response)
-        xml := loadXML(response)
-        props := xml.selectNodes("/response/property")
+        xml := DcLoadXml(response)
+        return xml.selectNodes("/response/property")
+    }
+    
+    GetChildren() {
+        props := this.GetProperties()
         return DcPropertyNode.FromXmlNodes(props, this.dbg)
     }
     
     GetWindowTitle() {
         return this.context=0 ? "Local vars" : "Global vars"
     }
+    
+    Update(tlv) {
+        props := this.GetProperties()
+        this.UpdateChildren(tlv, props)
+    }
 }
 
-DebugBegin(session, initPacket) {
-    if !(node := PendingThreads.Delete(session.thread += 0))
-        return session.detach(), session.Close()
-    session.feature_set("-n max_depth -v 0")
-    session.feature_set("-n max_data -v " ShortValueLimit)
-    session.run()
-    node.dbg := session
-    session.node := node
-    DbgSessions[session.thread] := session
+DebugBegin(dbg, initPacket) {
+    if !(node := PendingThreads.Delete(dbg.thread += 0))
+        return dbg.detach(), dbg.Close()
+    dbg.feature_set("-n max_depth -v 0")
+    dbg.feature_set("-n max_data -v " ShortValueLimit)
+    dbg.feature_get("-n language_version", response)
+    dbg.version := RegExReplace(DcLoadXml(response).selectSingleNode("response").text, " .*")
+    dbg.no_base64_numbers := dbg.version && dbg.version <= "1.1.24.02" ; Workaround.
+    dbg.run()
+    node.dbg := dbg
+    DbgSessions[dbg.thread] := dbg
 }
 
 DebugBreak() {
     ; This shouldn't be called, but needs to be present.
 }
 
-DebugEnd(session) {
-    DbgSessions.Delete(session.thread)
-    global dv
-    for i, node in dv.TLV.root.children {
-        if (node == session.node) {
-            dv.TLV.RemoveChild(dv.TLV.root, i)
-            break
+DebugEnd(dbg) {
+    DbgSessions.Delete(dbg.thread)
+    close := []
+    for hwnd, dv in DebugVars.Instances {
+        tlv := dv.TLV, root := tlv.root
+        if (dbg == root.dbg) {
+            close.Push(dv)
+            continue
+        }
+        n := 1, children := root.children
+        while n <= children.Length() {
+            if (dbg == children[n].dbg)
+                tlv.RemoveChild(root, n)
+            else
+                ++n
         }
     }
-    ; dv.TLV.RemoveNode(session.node)
-    session.node := ""
+    for i, dv in close
+        dv.Hide()
 }
 
 class DcDebugVars extends DebugVars
@@ -303,6 +404,7 @@ class DcDebugVars extends DebugVars
     
     UnregisterHwnd() {
         base.UnregisterHwnd()
+        this.SetAutoRefresh(0)
         if !this.Instances.MaxIndex() {
             DetachAll()
             ExitApp
@@ -311,24 +413,38 @@ class DcDebugVars extends DebugVars
     
     class Control extends DebugVars.Control {
         LV_Key_F5() {
-            if dv := DebugVars.Instances[this.hGui] {
-                DV_Update(dv)
-                return true
-            }
+            this.root.Update(this)
         }
     }
     
     OnContextMenu(node, isRightClick, x, y) {
-        try Menu DV_Menu, DeleteAll  ; In case we're interrupting a prior call.
-        if node.base != DcPropertyNode {
-            fn := ObjBindMethod(this, "NewWindow", node)
-            Menu DV_Menu, Add, New Window, % fn
-        } else {
-            fn := ObjBindMethod(this, "InspectNode", node)
-            Menu DV_Menu, Add, Inspect, % fn
-        }
-        Menu DV_Menu, Show, % x, % y
-        try Menu DV_Menu, Delete
+        try Menu DC_Menu, DeleteAll  ; In case we're interrupting a prior call.
+        if node.base != DcPropertyNode
+            Menu DC_Menu, Add, New window, DC_CM_NewWindow
+        else
+            Menu DC_Menu, Add, Inspect, DC_CM_InspectNode
+        Menu DC_Menu, Add, Refresh, DC_CM_Refresh
+        Menu DC_RefreshMenu, Add, Off, DC_CM_AutoRefresh
+        Menu DC_RefreshMenu, Add, 0.5 s, DC_CM_AutoRefresh
+        Menu DC_RefreshMenu, Add, 1.0 s, DC_CM_AutoRefresh
+        Menu DC_RefreshMenu, Add, 5.0 s, DC_CM_AutoRefresh
+        static refresh_intervals := [0, 500, 1000, 5000]
+        for i, interval in refresh_intervals
+            Menu DC_RefreshMenu, % interval=this.refresh_interval ? "Check" : "Uncheck", %i%&
+        Menu DC_Menu, Add, Auto refresh, :DC_RefreshMenu
+        Menu DC_Menu, Show, % x, % y
+        try Menu DC_Menu, Delete
+        return
+        DC_CM_NewWindow:
+        DC_CM_InspectNode:
+        this[SubStr(A_ThisLabel,7)](node)
+        return
+        DC_CM_Refresh:
+        this.Refresh()
+        return
+        DC_CM_AutoRefresh:
+        this.SetAutoRefresh(refresh_intervals[A_ThisMenuItemPos])
+        return
     }
     
     OnDoubleClick(node) {
@@ -346,47 +462,25 @@ class DcDebugVars extends DebugVars
         dv := new this.base(node.Clone())
         dv.Show()
     }
-}
-
-DV_Update(dv) {
-    tlv := dv.TLV
-    node := tlv.root
-    tlv.EnableRedraw(false)
-    ; Save scroll/focus
-    scrollPos := tlv.ScrollPos, oldfocus := tlv.FocusedNode
-    ; Reset tree
-    oldch := node.children
-    newch := node.children := node.GetChildren()
-    ; Transfer expanded state
-    DV_Update_Expand(oldch, newch, oldfocus, newfocus := "")
-    ; Refresh the control
-    tlv.Reset()
-    ; Restore scroll/focus
-    if newfocus
-        tlv.FocusedNode := newfocus
-    tlv.EnableRedraw(true)
-    tlv.ScrollPos := scrollPos ; Must be done after EnableRedraw(true).
-    ; Update window title
-    WinSetTitle % "ahk_id " dv.hGui,, % node.GetWindowTitle()
-}
-
-DV_Update_Expand(oldnodes, newnodes, oldfocus, ByRef newfocus) {
-    for _, oldnode in oldnodes {
-        if (!oldnode.expanded && oldnode != oldfocus)
-            continue
-        for _, newnode in newnodes {
-            if (newnode.fullname == oldnode.fullname) {
-                if (oldnode == oldfocus) {
-                    newfocus := newnode
-                    if !oldnode.expanded
-                        break
-                }
-                newnode.children := newnode.GetChildren()
-                newnode.expanded := true
-                DV_Update_Expand(oldnode.children, newnode.children, oldfocus, newfocus)
-                break
+    
+    refresh_interval := 0
+    SetAutoRefresh(interval) {
+        this.refresh_interval := interval
+        timer := this.timer
+        if !interval {
+            if timer {
+                SetTimer % timer, Delete
+                this.timer := ""
             }
+            return 
         }
+        if !timer
+            this.timer := timer := ObjBindMethod(this, "Refresh")
+        SetTimer % timer, % interval
+    }
+    
+    Refresh() {
+        this.TLV.root.Update(this.TLV)
     }
 }
 
@@ -395,10 +489,10 @@ DetachAll() {
         session.detach(), session.Close()
 }
 
-loadXML(ByRef data) {
+DcLoadXml(ByRef data) {
     o := ComObjCreate("MSXML2.DOMDocument")
     o.async := false
     o.setProperty("SelectionLanguage", "XPath")
-    o.loadXML(data)
+    o.loadXml(data)
     return o
 }
