@@ -40,6 +40,8 @@ class DebugVars extends TreeListView._Base
         AfterPopulate() {
             LV_ModifyCol(this.COL_NAME, 150*(A_ScreenDPI/96))
             this.AutoSizeValueColumn()
+            if !LV_GetNext(,"F")
+                LV_Modify(1, "Focus")
         }
         
         ExpandContract(r) {
