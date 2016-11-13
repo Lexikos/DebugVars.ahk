@@ -20,7 +20,8 @@ DvInspectProperty(dbg, fullname, extra_args:="") {
         isReadOnly := prop.getAttribute("facet") = "Builtin"
         value := DBGp_Base64UTF8Decode(prop.text)
         dv := new DebugVarGui(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
-    } else {
+    }
+    else {
         dv := new DebugVarsGui(new DvPropertyNode(dbg, prop))
     }
     dv.Show()
@@ -122,10 +123,13 @@ class DvPropertyNode extends DvPropertyParentNode
         this.name := prop.getAttribute("name")
         this.xml := prop
         props := prop.selectNodes("property")
-        if props.length
+        if props.length {
             this.children := this.FromXmlNodes(props, dbg)
-        else
+            ObjRawSet(this, "expanded", false)
+        }
+        else {
             this._value := DBGp_Base64UTF8Decode(prop.text)
+        }
         this.values := [this.name, this.GetValueString()]
     }
     
