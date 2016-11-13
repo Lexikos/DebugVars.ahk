@@ -179,12 +179,10 @@ class TreeListView extends TreeListView._Base
         else if parent.expanded {
             ; Find the last visible descendent (parent if none)
             node := parent
-            loop
-                node := node.children[node.children.Length()]
-            until !node.expanded
-            ; Insert after this node
-            if (r := this.RowFromNode(node))
-                r += 1
+            while (n := node.children.Length()) && node.expanded
+                node := node.children[n]
+            ; Insert after this node (if RowFromNode returns 0, it's likely the root)
+            r := this.RowFromNode(node) + 1
         }
         parent.children.InsertAt(i, child)
         child.level := (parent == this.root) ? 0 : parent.level + 1
