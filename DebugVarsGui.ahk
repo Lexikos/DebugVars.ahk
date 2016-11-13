@@ -205,7 +205,7 @@ class DvPropertyNode extends DvPropertyParentNode
     }
     
     Update(tlv, prop:="") {
-        if !prop || prop.getAttribute("children")
+        if !prop || prop.getAttribute("children") && !prop.selectSingleNode("property")
             prop := this.GetProperty()
         else
             this.xml := prop
