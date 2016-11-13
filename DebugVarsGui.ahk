@@ -266,9 +266,14 @@ class DebugVarsGui extends VarTreeGui
         }
     }
     
-    class Control extends VarTreeGui.Control {
+    class Control extends VarTreeGui.Control
+    {
         LV_Key_F5() {
             this.root.Update(this)
+        }
+        
+        LV_Key_Enter(r, node) {
+            DvInspectProperty(node.dbg, node.xml.getAttribute("fullname"))
         }
     }
     
