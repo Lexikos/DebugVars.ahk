@@ -34,15 +34,21 @@ class DebugVarGui extends VarEditGui
     }
     
     OnSave(value, type) {
-        if (type = "integer" || type = "float") && this.dbg.no_base64_numbers
-            data := value
-        else
-            data := DBGp_Base64UTF8Encode(value)
-        this.dbg.property_set("-n " this.var.name " -t " type " -- " data)
+        DvSetProperty(this.dbg, this.var.name, value, type)
         this.var.value := value
         this.var.type := type
         DvRefreshAll()
     }
+}
+
+DvSetProperty(dbg, fullname, ByRef value, type, ByRef response:="") {
+    if (type = "integer")
+        value := format("{:i}", value) ; Force decimal format.
+    if (type = "integer" || type = "float") && dbg.no_base64_numbers
+        data := value
+    else
+        data := DBGp_Base64UTF8Encode(value)
+    dbg.property_set("-n " fullname " -t " type " -- " data, response)
 }
 
 class DvNodeBase extends TreeListView._Base
@@ -179,8 +185,13 @@ class DvPropertyNode extends DvPropertyParentNode
     }
     
     SetValue(ByRef value) {
-        this.dbg.property_set("-n " this.xml.getAttribute("fullname")
-            . " -- " DBGp_Base64UTF8Encode(value), response)
+        type := this.xml.getAttribute("type") ; Try to match type of previous value.
+        if (type = "float" || type = "integer") && value+0 != ""
+            type := InStr(value, ".") ? "float" : "integer"
+        else
+            type := "string"
+        DvSetProperty(this.dbg, this.xml.getAttribute("fullname")
+            , value, type, response)
         if InStr(response, "<error") || InStr(response, "success=""0""")
             return false
         ; Update .xml for @classname and @children, and in case the value
@@ -197,7 +208,7 @@ class DvPropertyNode extends DvPropertyParentNode
         props := prop.selectNodes("property")
         value2 := this.values[2]
         this.value := props.length ? "" : DBGp_Base64UTF8Decode(prop.text)
-        if !(this.values[2] == value2) ; Prevent unnecessary redraw and flicker.
+        if !(this.values[2] "" ==  "" value2) ; Prevent unnecessary redraw and flicker.
             tlv.RefreshValues(this)
         this.UpdateChildren(tlv, props)
     }
