@@ -273,7 +273,7 @@ class DebugVarsGui extends VarTreeGui
     class Control extends VarTreeGui.Control
     {
         LV_Key_F5() {
-            this.root.Update(this)
+            VarTreeGui.Instances[this.hGui].Refresh()
         }
         
         LV_Key_Enter(r, node) {
@@ -345,6 +345,7 @@ class DebugVarsGui extends VarTreeGui
     
     Refresh() {
         this.TLV.root.Update(this.TLV)
+        WinSetTitle % "ahk_id " this.hGui,, % this.TLV.root.GetWindowTitle()
     }
 }
 
