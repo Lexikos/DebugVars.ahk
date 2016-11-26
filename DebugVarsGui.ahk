@@ -158,12 +158,10 @@ class DvPropertyNode extends DvPropertyParentNode
     }
     
     GetProperty() {
-        ; SetEnableChildren(true) ; SciTE
         this.dbg.feature_set("-n max_depth -v 1")
         this.dbg.property_get("-n " this.fullname, response)
         this.dbg.feature_set("-n max_depth -v 0")
-        ; SetEnableChildren(false) ; SciTE
-        xml := DvLoadXml(response) ; SciTE
+        xml := DvLoadXml(response)
         return this.xml := xml.selectSingleNode("/response/property")
     }
     
