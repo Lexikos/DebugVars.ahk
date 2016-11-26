@@ -88,7 +88,7 @@ class DvScriptNode extends DvNodeBase
         WinGetTitle title, ahk_id %hwnd%
         title := RegExReplace(title, " - AutoHotkey v\S*$")
         SplitPath title, name, dir
-        this.values := [name, hwnd "  -  " dir]
+        this.values := [name, format("0x{:x}", hwnd) "  -  " dir]
     }
     
     GetChildren() {
