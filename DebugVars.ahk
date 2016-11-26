@@ -25,8 +25,15 @@ CloseAll(exitReason:="") {
     ExitApp
 }
 
-dv := new DebugVarsGui(new DvAllScriptsNode)
-dv.Show()
+OnMessage(2, Func("OnWmDestroy"))
+OnWmDestroy(wParam, lParam, msg, hwnd) {
+    if !DebugVarsGui.Instances.MaxIndex() {
+        DetachAll()
+        ExitApp
+    }
+}
+
+(new DebugVarsGui(new DvAllScriptsNode)).Show()
 
 class DvAllScriptsNode extends DvNodeBase
 {

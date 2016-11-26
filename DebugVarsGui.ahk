@@ -264,10 +264,6 @@ class DebugVarsGui extends VarTreeGui
     UnregisterHwnd() {
         base.UnregisterHwnd()
         this.SetAutoRefresh(0)
-        if !this.Instances.MaxIndex() {
-            DetachAll()
-            ExitApp
-        }
     }
     
     class Control extends VarTreeGui.Control
