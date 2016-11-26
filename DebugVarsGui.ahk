@@ -174,8 +174,10 @@ class DvPropertyNode extends DvPropertyParentNode
     }
     
     GetValueString() {
-        return (cn := this.xml.getAttribute("classname")) ? cn
-            : this.value . (this.xml.getAttribute("size") > ShortValueLimit ? "..." : "")
+        if (cn := this.xml.getAttribute("classname"))
+            return cn
+        utf8_len := StrPut(this.value, "UTF-8") - 1
+        return this.value (this.xml.getAttribute("size") > utf8_len ? "..." : "")
     }
     
     GetWindowTitle() {
