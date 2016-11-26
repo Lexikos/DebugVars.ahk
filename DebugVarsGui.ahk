@@ -2,7 +2,7 @@
 #Include VarTreeGui.ahk
 #Include VarEditGui.ahk
 
-DvInspectProperty(dbg, fullname, extra_args:="") {
+DvInspectProperty(dbg, fullname, extra_args:="", show_opt:="") {
     dbg.feature_set("-n max_depth -v 1")
     ; 1MB seems reasonably permissive.  Note that -m 0 (unlimited
     ; according to the spec) doesn't work with v1.1.24.02 and earlier.
@@ -24,7 +24,7 @@ DvInspectProperty(dbg, fullname, extra_args:="") {
     else {
         dv := new DebugVarsGui(new DvPropertyNode(dbg, prop))
     }
-    dv.Show()
+    dv.Show(show_opt)
 }
 
 class DebugVarGui extends VarEditGui
