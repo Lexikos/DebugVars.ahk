@@ -205,6 +205,7 @@ class DvPropertyNode extends DvPropertyParentNode
     }
     
     Update(tlv, prop:="") {
+        had_children := this.xml.getAttribute("children")
         if !prop || prop.getAttribute("children") && !prop.selectSingleNode("property")
             prop := this.GetProperty()
         else
@@ -213,6 +214,7 @@ class DvPropertyNode extends DvPropertyParentNode
         value2 := this.values[2]
         this.value := props.length ? "" : DBGp_Base64UTF8Decode(prop.text)
         if !(this.values[2] "" ==  "" value2) ; Prevent unnecessary redraw and flicker.
+            || (had_children != prop.getAttribute("children"))
             tlv.RefreshValues(this)
         this.UpdateChildren(tlv, props)
     }
