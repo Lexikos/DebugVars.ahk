@@ -256,6 +256,28 @@ class DvContextNode extends DvPropertyParentNode
     }
 }
 
+class Dv2ContextsNode extends DvNodeBase
+{
+    static expandable := true
+    
+    __new(dbg) {
+        this.dbg := dbg
+    }
+    
+    GetChildren() {
+        children := []
+        Loop 2 {
+            children[A_Index] := new DvContextNode(this.dbg, A_Index-1)
+            children[A_Index].expanded := true
+        }
+        return children
+    }
+    
+    GetWindowTitle() {
+        return "Variables"
+    }
+}
+
 class DebugVarsGui extends VarTreeGui
 {
     Show(options:="", title:="") {

@@ -86,10 +86,8 @@ class DvAllScriptsNode extends DvNodeBase
     }
 }
 
-class DvScriptNode extends DvNodeBase
+class DvScriptNode extends Dv2ContextsNode
 {
-    static expandable := true
-    
     __new(hwnd) {
         this.hwnd := hwnd
         WinGetTitle title, ahk_id %hwnd%
@@ -115,7 +113,7 @@ class DvScriptNode extends DvNodeBase
             }
             Sleep 15
         }
-        return [new DvContextNode(this.dbg, 0), new DvContextNode(this.dbg, 1)]
+        return base.GetChildren()
     }
     
     GetWindowTitle() {
