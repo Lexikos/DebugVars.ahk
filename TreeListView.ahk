@@ -657,6 +657,9 @@ class TreeListView extends TreeListView._Base
         __call(name:="") {
             throw Exception("Unknown method", -1, name)
         }
+        _NewEnum() { ; Allow enumeration for debugging.
+            return ObjNewEnum(this)
+        }
     }
     
     ;}
