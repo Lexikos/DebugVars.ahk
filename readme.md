@@ -111,6 +111,8 @@ When the GUI is destroyed, the control's `OnDestroy` method clears each node's `
 
 It can be useful to calculate *children* on-demand with a dynamic property or meta-function. For example, if the control is being used to display the contents of an object with circular references, building the entire tree is impossible (because it is infinitely large). Instead, the children can be calculated when the control first requests them, which is typically when the user expands the parent node. Do not modify the array directly while it is being displayed by the control; use `InsertChild`, `RemoveChild` and `RemoveNode` instead.
 
+The *expanded* property can be used to detect when the node is first expanded. See VarTreeObjectNode for an example. 
+
 ## Acknowledgements
 
 Several `TreeListView.LV_` methods are based on [LV_EX](https://autohotkey.com/boards/viewtopic.php?f=6&t=1256) by *just me*. 

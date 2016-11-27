@@ -12,10 +12,17 @@ class VarTreeObjectNode extends TreeListView._Base
         }
     }
     
-    children {
+    expanded {
+        set {
+            if value {
+                ; Expanded for the first time: populate.
+                this.children := this._MakeChildren()
+                ObjRawSet(this, "expanded", true)
+            }
+            return value
+        }
         get {
-            ; Store the value so 'get' won't be called again:
-            return this.children := this._MakeChildren()
+            return false
         }
     }
     
