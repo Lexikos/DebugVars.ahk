@@ -2,6 +2,7 @@
 #Include DebugVarsGui.ahk
 
 global ShortValueLimit := 64
+global MaxChildren := 1000
 
 global PendingThreads := {}
 global DbgSessions := {}
@@ -126,6 +127,7 @@ DebugBegin(dbg, initPacket) {
         return dbg.detach(), dbg.Close()
     dbg.feature_set("-n max_depth -v 0")
     dbg.feature_set("-n max_data -v " ShortValueLimit)
+    dbg.feature_set("-n max_children -v " MaxChildren)
     dbg.feature_get("-n language_version", response)
     dbg.version := RegExReplace(DvLoadXml(response).selectSingleNode("response").text, " .*")
     dbg.no_base64_numbers := dbg.version && dbg.version <= "1.1.24.02" ; Workaround.
