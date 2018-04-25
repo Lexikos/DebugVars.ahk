@@ -25,34 +25,31 @@ class VarEditGui {
     SetVar(aVar) {
         this.Dirty := false
         this.Var := aVar
-        GuiControl Disable, % this.hSaveBtn
+        this.cSave.Enabled := false
         
         type := aVar.type
         value := aVar.value
         readonly := aVar.readonly
         
         if readonly
-            types := "|" type
+            types := type
         else {
             ; 'undefined' can't be set by the user, but may be the initial type
-            types := (type = "undefined" ? "|undefined" : "") "|string"
+            types := (type = "undefined" ? "undefined|" : "") "string"
             if VarEditGui_isInt64(value)
                 types .= "|integer" (InStr(value,"0x") ? "" : "|float")
             else if VarEditGui_isFloat(value)
                 types .= "|float"
         }
-        GuiControl,, % this.hType, % types
-        GuiControl Choose, % this.hType, % type
+        this.cType.Add(types)
+        this.cType.Choose(type)
         this.preferredType := type
         
-        GuiControl % (readonly ? "+" : "-") "ReadOnly", % this.hEdit
+        this.cEdit.Opt((readonly ? "+" : "-") "ReadOnly")
         
-        OnMessage(0x111, Func("VarEditGui_Suppress"), 1)
-        GuiControl,, % this.hEdit, % value
-        Sleep -1
-        OnMessage(0x111, Func("VarEditGui_Suppress"), 0)
+        this.cEdit.Value := value
         
-        GuiControl,, % InStr(value,"`r`n") ? this.hCRLF : this.hLF, 1
+        this[InStr(value,"`r`n") ? "cCRLF" : "cLF"].Value := true
         this.DisEnableEOLControls(value, readonly)
         this.CheckWantReturn(type)
         
@@ -60,47 +57,41 @@ class VarEditGui {
     }
     
     CreateGui(editOpt:="") {
-        Gui New, hwndhGui LabelVarEditGui_On +Resize
+        Gui := GuiCreate("+Resize")
+        Gui.OnEvent("Close", "VarEditGui_OnClose")
+        Gui.OnEvent("Escape", "VarEditGui_OnEscape")
+        Gui.OnEvent("Size", "VarEditGui_OnSize")
+        this.Gui := Gui
         
-        Gui Add, Edit, hwndhEdit w300 r10 %editOpt%
-        fn := this.ChangeValue.Bind(this)
-        GuiControl +g, % hEdit, % fn
+        this.cEdit := Gui.AddEdit("w300 r10 " editOpt)
+        this.cEdit.OnEvent("Change", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeValue())
         
-        GuiControlGet c, Pos, % hEdit
-        this.marginX := cX, this.marginY := cY
+        pos := this.cEdit.Pos
+        this.marginX := pos.X, this.marginY := pos.Y
         
-        Gui Add, DDL, w70 hwndhType, undefined||
-        fn := this.ChangeType.Bind(this)
-        GuiControl +g, % hType, % fn
+        this.cType := Gui.AddDDL("w70", "undefined||")
+        this.cType.OnEvent("Change", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeType())
         
-        GuiControlGet c, Pos, % hType
+        cH := this.cType.Pos.H
         this.footerH := cH
         
-        Gui Add, Radio, x+m h%cH% hwndhLF, LF
-        Gui Add, Radio, x+0 h%cH% hwndhCRLF, CR+LF
-        fn := this.ChangeEOL.Bind(this)
-        GuiControl +g, % hLF, % fn
-        GuiControl +g, % hCRLF, % fn
+        this.cLF := Gui.AddRadio("x+m h" cH, "LF")
+        this.cCRLF := Gui.AddRadio("x+0 h" cH, "CR+LF")
+        fn := (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeEOL()
+        this.cLF.OnEvent("Click", fn)
+        this.cCRLF.OnEvent("Click", fn)
         
-        Gui Add, Button, x+m Disabled hwndhSaveBtn, &Save
-        fn := this.SaveEdit.Bind(this)
-        GuiControl +g, % hSaveBtn, % fn
+        this.cSave := Gui.AddButton("x+m Disabled", "&Save")
+        this.cSave.OnEvent("Click", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].SaveEdit())
         
-        GuiControlGet c, Pos, % hSaveBtn
-        cX += cW + this.marginX
-        Gui +MinSize%cX%x
-        
-        this.hGui := hGui
-        this.hEdit := hEdit
-        this.hType := hType
-        this.hLF := hLF
-        this.hCRLF := hCRLF
-        this.hSaveBtn := hSaveBtn
+        pos := this.cSave.Pos
+        pos.X += pos.W + this.marginX
+        Gui.Opt("+MinSize" pos.X "x")
     }
     
     Show(options:="") {
-        VarEditGui.Instances[this.hGui] := this
-        Gui % this.hGui ":Show", % options
+        VarEditGui.Instances[this.Gui.Hwnd] := this
+        this.Gui.Show(options)
     }
     
     Cancel() {
@@ -111,8 +102,8 @@ class VarEditGui {
     }
     
     Hide() {
-        Gui % this.hGui ":Hide"
-        VarEditGui.RevokeHwnd(this.hGui)
+        this.Gui.Hide()
+        VarEditGui.RevokeHwnd(this.Gui.Hwnd)
     }
     
     RevokeHwnd(hwnd) {
@@ -120,49 +111,45 @@ class VarEditGui {
     }
     
     __Delete() {
-        Gui % this.hGui ":Destroy"
+        this.Gui.Destroy()
     }
     
     GuiSize(w, h) {
         cW := w - this.marginX*2
         cH := h - this.marginY*3 - this.footerH
-        GuiControl Move, % this.hEdit, w%cW% h%cH%
+        this.cEdit.Move("w" cW " h" cH)
         y := cH + this.marginY*2
-        GuiControl Move, % this.hType, y%y%
-        Loop 4
-            GuiControl Move, Button%A_Index%, y%y%
-        GuiControlGet c, Pos, % this.hSaveBtn
-        cX := w - this.marginX - cW
-        GuiControl Move, % this.hSaveBtn, x%cX% y%y%
+        this.cType.Move("y" y)
+        this.cLF.Move("y" y)
+        this.cCRLF.Move("y" y)
+        pos := this.cSave.Pos
+        x := w - this.marginX - pos.W
+        this.cSave.Move("x" x " y" y-2)
     }
     
     UpdateTitle() {
-        ; Avoiding Gui Show so GuiSize won't be called before Gui is shown,
-        ; and WinSetTitle in case of DetectHiddenWindows Off.
-        DllCall("SetWindowText", "ptr", this.hGui, "str"
-            , "Inspector - " this.Var.name (this.Dirty ? " (modified)" : ""))
+        this.Gui.Title := "Inspector - "
+            . this.Var.name (this.Dirty ? " (modified)" : "")
     }
     
     BeginEdit() {
-        if !this.OnDirty() {
+        if !(this.OnDirty && this.OnDirty()) {
             this.Dirty := true
-            GuiControl Enable, % this.hSaveBtn
+            this.cSave.Enabled := true
             this.UpdateTitle()
         }
     }
     
     CancelEdit() {
-        if !this.OnCancel()
+        if !(this.OnCancel && this.OnCancel())
             this.SetVar(this.Var)
     }
     
     SaveEdit() {
-        GuiControlGet value,, % this.hEdit
-        GuiControlGet type,, % this.hType
-        GuiControlGet crlf,, % this.hCRLF
-        if crlf
+        value := this.cEdit.Value
+        if this.cCRLF.Value
             value := StrReplace(value, "`n", "`r`n")
-        if !this.OnSave(value, type)
+        if !this.OnSave(value, this.cType.Value)
             this.SetVar(this.Var)
     }
     
@@ -172,50 +159,49 @@ class VarEditGui {
     }
     
     ChangeType() {
-        GuiControlGet type,, % this.hType
+        type := this.cType.Value
         this.preferredType := type
-        GuiControlGet value,, % this.hEdit
         this.CheckWantReturn(type)
         if !this.Dirty
             this.BeginEdit()
     }
     
     ChangeValue() {
-        GuiControlGet value,, % this.hEdit
+        value := this.cEdit.Value
+        this.cType.Delete()
         if (value = "" || !VarEditGui_isFloat(value) && !VarEditGui_isInt64(value)) {
             ; Only 'string' is valid for this value
-            GuiControl,, % this.hType, |string||
+            this.cType.Add("string||")
         }
         else {
-            types := "|string"
+            types := "string"
             if InStr(value, "0x")
                 types .= "|integer||"
             else if InStr(value, ".")
                 types .= "|float||"
             else
                 types .= "|integer||float"
-            GuiControl,, % this.hType, %types%
-            GuiControl Choose, % this.hType, % this.preferredType
+            this.cType.Add(types)
+            try this.cType.Choose(this.preferredType)
         }
         this.DisEnableEOLControls(value, false)
-        GuiControlGet type,, % this.hType
-        this.CheckWantReturn(type)
+        this.CheckWantReturn(this.cType.Value)
         if !this.Dirty
             this.BeginEdit()
     }
     
     DisEnableEOLControls(value, readonly) {
-        disen := (!readonly && InStr(value,"`n")) ? "Enable" : "Disable"
-        GuiControl % disen, % this.hLF
-        GuiControl % disen, % this.hCRLF
+        enabled := !readonly && InStr(value,"`n")
+        this.cLF.Enabled := enabled
+        this.cCRLF.Enabled := enabled
     }
     
     CheckWantReturn(type) {
         ; For convenience, make Enter activate the Save button if user
         ; is unlikely to want to insert a newline (i.e. type is numeric).
         WantReturn := !(type = "integer" || type = "float")
-        GuiControl % (WantReturn ? "+" : "-") "WantReturn", % this.hEdit
-        GuiControl % (Wantreturn ? "-" : "+") "Default", % this.hSaveBtn
+        this.cEdit.Opt((WantReturn ? "+" : "-") "WantReturn")
+        this.cSave.Opt((Wantreturn ? "-" : "+") "Default")
     }
 }
 
@@ -231,23 +217,17 @@ VarEditGui_isInt64(s) {
 }
 
 VarEditGui_isFloat(s) {
-    if s is float
-        return s
-    return false
+    return s is "float"
 }
 
-VarEditGui_OnClose(hwnd) {
-    VarEditGui.RevokeHwnd(hwnd)
+VarEditGui_OnClose(g) {
+    VarEditGui.RevokeHwnd(g.hwnd)
 }
 
-VarEditGui_OnEscape(hwnd) {
-    VarEditGui.Instances[hwnd].Cancel()
+VarEditGui_OnEscape(g) {
+    VarEditGui.Instances[g.hwnd].Cancel()
 }
 
-VarEditGui_OnSize(hwnd, e, w, h) {
-    VarEditGui.Instances[hwnd].GuiSize(w, h)
-}
-
-VarEditGui_Suppress() {
-    return 0
+VarEditGui_OnSize(g, state, w, h) {
+    VarEditGui.Instances[g.hwnd].GuiSize(w, h)
 }
