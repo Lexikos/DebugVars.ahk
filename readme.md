@@ -98,7 +98,6 @@ Retrieves the ListView row of a given node or vice versa. Nodes which aren't vis
 ```AutoHotkey
 tlv.InsertChild(parent, index, child)
 tlv.RemoveChild(parent, index)
-tlv.RemoveNode(node)
 ```
 
 These methods can be used to manipulate the tree after the control is created. ListView rows will be inserted or removed as appropriate if the node is visible.
@@ -169,7 +168,7 @@ When the GUI is destroyed, the control's `OnDestroy` method clears each node's `
 
 ## Dynamic Nodes
 
-It can be useful to calculate *children* on-demand with a dynamic property or meta-function. For example, if the control is being used to display the contents of an object with circular references, building the entire tree is impossible (because it is infinitely large). Instead, the children can be calculated when the control first requests them, which is typically when the user expands the parent node. Do not modify the array directly while it is being displayed by the control; use `InsertChild`, `RemoveChild` and `RemoveNode` instead.
+It can be useful to calculate *children* on-demand with a dynamic property or meta-function. For example, if the control is being used to display the contents of an object with circular references, building the entire tree is impossible (because it is infinitely large). Instead, the children can be calculated when the control first requests them, which is typically when the user expands the parent node. Do not modify the array directly while it is being displayed by the control; use `InsertChild` and `RemoveChild` instead.
 
 The *expanded* property can be used to detect when the node is first expanded. See VarTreeObjectNode for an example. 
 

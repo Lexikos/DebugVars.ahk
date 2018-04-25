@@ -34,7 +34,6 @@ class TreeListView extends TreeListView._Base
         
         this.root := RootNode
         RootNode.expanded := true
-        this.LinkNode(RootNode)
         
         restore_gui_on_return := new this.GuiScope()
         
@@ -85,7 +84,6 @@ class TreeListView extends TreeListView._Base
     
     OnDestroy() {
         this.UnregisterHwnd()
-        this.UnlinkNode(this.root)
     }
     
     ;}
@@ -186,7 +184,6 @@ class TreeListView extends TreeListView._Base
         }
         parent.children.InsertAt(i, child)
         child.level := (parent == this.root) ? 0 : parent.level + 1
-        this.LinkNode(child)
         if r {
             restore_gui_on_return := this.LV_BeginScope()
             this.InsertRow(r, child)
@@ -199,28 +196,6 @@ class TreeListView extends TreeListView._Base
             restore_gui_on_return := this.LV_BeginScope()
             this.RemoveRow(r)
         }
-        this.UnlinkNode(child)
-    }
-    
-    RemoveNode(node) {
-        for i, n in node.parent.children
-            if (n == node)
-                return this.RemoveChild(node.parent, i)
-    }
-    
-    LinkNode(node, parent:="") {
-        node.parent := parent
-        if !node.expandable
-            return
-        for i, child in node.children
-            this.LinkNode(child, node)
-    }
-    UnlinkNode(node) {
-        node.parent := ""
-        if !node.expandable
-            return
-        for i, child in node.children
-            this.UnlinkNode(child)
     }
     
     ;}
