@@ -5,7 +5,7 @@ TODO:
 
 */
 
-#Warn,, StdOut
+#Warn , StdOut
 global A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
 
 test_vars := "
@@ -17,7 +17,7 @@ test_vars := "
         A_Args
     )"
 test_obj := {}
-Loop Parse, % test_vars, `n
+Loop Parse test_vars, "`n"
     test_obj[A_LoopField] := %A_LoopField%
 ShowGuiForObject(test_obj)
 while VarTreeGui.Instances.Length()
@@ -32,11 +32,9 @@ ShowGuiForObject(obj) {
 }
 
 ContextMenu(vtg, node, isRightClick, x, y) {
-    try Menu OEmenu, DeleteAll
-    fn := Func("EditNode").Bind(vtg, node)
-    Menu OEmenu, Add, Inspect, % fn
-    Menu OEmenu, Show, % x, % y
-    try Menu OEmenu, Delete
+    m := MenuCreate()
+    m.Add("Inspect", Func("EditNode").Bind(vtg, node))
+    m.Show(x, y)
 }
 
 EditNode(vtg, node) {
@@ -44,7 +42,7 @@ EditNode(vtg, node) {
         ShowGuiForObject(node.value)
     }
     else {
-        gui := new VarEditGui({name: node.values[1], value: node.value, type: vt_type(node.value)})
+        gui := new VarEditGui({name: node.values[1], value: node.value, type: type(node.value)})
         gui.OnSave := Func("ED_Save").Bind(vtg, node)
         gui.Show()
     }
@@ -61,13 +59,6 @@ ED_Save(vtg, node, ed, value, type) {
     vtg.EnableRedraw(true)
     ed.Var.value := value
     ed.Var.type := type
-}
-
-; https://autohotkey.com/boards/viewtopic.php?t=2306
-vt_type(v) {
-    if IsObject(v)
-        return "Object"
-    return v="" || [v].GetCapacity(1) ? "string" : InStr(v,".") ? "float" : "integer"
 }
 
 #Include VarTreeGui.ahk

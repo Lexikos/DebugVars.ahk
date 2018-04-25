@@ -41,9 +41,7 @@ class VarTreeObjectNode extends TreeListView._Base
         if IsObject(value) {
             try if value.ToString
                 return value.ToString()
-            try if className := value.__Class
-                return className
-            return "Object"
+            return type(value)
         }
         return value
     }

@@ -31,6 +31,7 @@ class VarEditGui {
         value := aVar.value
         readonly := aVar.readonly
         
+        this.cType.Delete()
         if readonly
             types := type
         else {
