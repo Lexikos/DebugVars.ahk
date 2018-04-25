@@ -64,25 +64,24 @@ class VarEditGui {
         this.Gui := Gui
         
         this.cEdit := Gui.AddEdit("w300 r10 " editOpt)
-        this.cEdit.OnEvent("Change", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeValue())
+        this.cEdit.OnEvent("Change", Func("VarEditGui_OnChangeValue"))
         
         pos := this.cEdit.Pos
         this.marginX := pos.X, this.marginY := pos.Y
         
         this.cType := Gui.AddDDL("w70", "undefined||")
-        this.cType.OnEvent("Change", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeType())
+        this.cType.OnEvent("Change", Func("VarEditGui_OnChangeType"))
         
         cH := this.cType.Pos.H
         this.footerH := cH
         
         this.cLF := Gui.AddRadio("x+m h" cH, "LF")
         this.cCRLF := Gui.AddRadio("x+0 h" cH, "CR+LF")
-        fn := (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].ChangeEOL()
-        this.cLF.OnEvent("Click", fn)
-        this.cCRLF.OnEvent("Click", fn)
+        this.cLF.OnEvent("Click", Func("VarEditGui_OnChangeEOL"))
+        this.cCRLF.OnEvent("Click", Func("VarEditGui_OnChangeEOL"))
         
         this.cSave := Gui.AddButton("x+m Disabled", "&Save")
-        this.cSave.OnEvent("Click", (ctrl) => VarEditGui.Instances[ctrl.Gui.Hwnd].SaveEdit())
+        this.cSave.OnEvent("Click", Func("VarEditGui_OnClickSave"))
         
         pos := this.cSave.Pos
         pos.X += pos.W + this.marginX
@@ -203,6 +202,19 @@ class VarEditGui {
         this.cEdit.Opt((WantReturn ? "+" : "-") "WantReturn")
         this.cSave.Opt((Wantreturn ? "-" : "+") "Default")
     }
+}
+
+VarEditGui_OnChangeValue() {
+    VarEditGui.Instances[WinExist()].ChangeValue()
+}
+VarEditGui_OnChangeType() {
+    VarEditGui.Instances[WinExist()].ChangeType()
+}
+VarEditGui_OnChangeEOL() {
+    VarEditGui.Instances[WinExist()].ChangeEOL()
+}
+VarEditGui_OnClickSave() {
+    VarEditGui.Instances[WinExist()].SaveEdit()
 }
 
 VarEditGui_isInt64(s) {
