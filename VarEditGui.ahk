@@ -62,29 +62,20 @@ class VarEditGui {
     CreateGui(editOpt:="") {
         Gui New, hwndhGui LabelVarEditGui_On +Resize
         
-        Gui Add, Edit, hwndhEdit w300 r10 %editOpt%
-        fn := this.ChangeValue.Bind(this)
-        GuiControl +g, % hEdit, % fn
+        Gui Add, Edit, hwndhEdit gVarEditGui_OnChangeValue w300 r10 %editOpt%
         
         GuiControlGet c, Pos, % hEdit
         this.marginX := cX, this.marginY := cY
         
-        Gui Add, DDL, w70 hwndhType, undefined||
-        fn := this.ChangeType.Bind(this)
-        GuiControl +g, % hType, % fn
+        Gui Add, DDL, w70 hwndhType gVarEditGui_OnChangeType, undefined||
         
         GuiControlGet c, Pos, % hType
         this.footerH := cH
         
-        Gui Add, Radio, x+m h%cH% hwndhLF, LF
-        Gui Add, Radio, x+0 h%cH% hwndhCRLF, CR+LF
-        fn := this.ChangeEOL.Bind(this)
-        GuiControl +g, % hLF, % fn
-        GuiControl +g, % hCRLF, % fn
+        Gui Add, Radio, x+m h%cH% hwndhLF gVarEditGui_OnChangeEOL, LF
+        Gui Add, Radio, x+0 h%cH% hwndhCRLF gVarEditGui_OnChangeEOL, CR+LF
         
-        Gui Add, Button, x+m Disabled hwndhSaveBtn, &Save
-        fn := this.SaveEdit.Bind(this)
-        GuiControl +g, % hSaveBtn, % fn
+        Gui Add, Button, x+m Disabled hwndhSaveBtn gVarEditGui_OnClickSave, &Save
         
         GuiControlGet c, Pos, % hSaveBtn
         cX += cW + this.marginX
@@ -217,6 +208,19 @@ class VarEditGui {
         GuiControl % (WantReturn ? "+" : "-") "WantReturn", % this.hEdit
         GuiControl % (Wantreturn ? "-" : "+") "Default", % this.hSaveBtn
     }
+}
+
+VarEditGui_OnChangeValue() {
+    VarEditGui.Instances[WinExist()].ChangeValue()
+}
+VarEditGui_OnChangeType() {
+    VarEditGui.Instances[WinExist()].ChangeType()
+}
+VarEditGui_OnChangeEOL() {
+    VarEditGui.Instances[WinExist()].ChangeEOL()
+}
+VarEditGui_OnClickSave() {
+    VarEditGui.Instances[WinExist()].SaveEdit()
 }
 
 VarEditGui_isInt64(s) {
