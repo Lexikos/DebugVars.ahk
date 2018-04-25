@@ -40,7 +40,7 @@ EditNode(vtg, node) {
         gui := new VarTreeGui(new VarTreeObjectNode(node.value))
     }
     else {
-        gui := new VarEditGui({name: node.name, value: node.value, type: vt_type(node.value)})
+        gui := new VarEditGui({name: node.values[1], value: node.value, type: vt_type(node.value)})
         gui.OnSave := Func("ED_Save").Bind(vtg, node)
     }
     gui.Show()
