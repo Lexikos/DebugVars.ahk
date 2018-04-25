@@ -29,42 +29,36 @@ class TreeListView extends TreeListView._Base
         OnMessage(0x4E, this.OnWmNotify.Bind(this))
     }
     
-    __New(RootNode, Options:="", Headers:=" | ", GuiName:="") {
+    __New(Gui, RootNode, Options:="", Headers:=" | ") {
         TreeListView.InitClass()
         
         this.root := RootNode
         RootNode.expanded := true
         this.LinkNode(RootNode)
         
-        restore_gui_on_return := new this.GuiScope()
-        
-        if (GuiName != "")
-            Gui %GuiName%: Default
-        Gui +hwndhGui
+        this.hGui := Gui.Hwnd
         ; The requirements for the old ListView content to NOT appear momentarily
         ; when we hide the Edit control seem to be: 1) Edit is created first; and
         ; 2) ListView has WS_CLIPSIBLINGS (+0x4000000).
-        Gui Add, Edit, % "hwndhEdit Hidden "
-            . (DllCall("GetWindow", "ptr", hGui, "uint", 5, "ptr")
-                ? "xp yp wp yp" : "xm y0 w0 h0") ; Preserve point of origin for LV
-        Gui Add, ListView, NoSortHdr +0x4000000 %Options% hwndhLV, %Headers%
-        this.hGui := hGui
-        this.hLV := hLV
-        this.hEdit := hEdit
+        this.Edit := Gui.AddEdit("Hidden "
+            . (DllCall("GetWindow", "ptr", Gui.Hwnd, "uint", 5, "ptr")
+                ? "xp yp wp yp" : "xm y0 w0 h0")) ; Preserve point of origin for LV
+        this.LV := Gui.AddListView("NoSortHdr +0x4000000 " Options, Headers)
+        this.hLV := this.LV.Hwnd
+        this.hEdit := this.Edit.Hwnd
         
         static LVM_GETHEADER := 0x101F
-        SendMessage % LVM_GETHEADER,,,, % "ahk_id " this.hLV
-        this.hLVH := ErrorLevel
+        this.hLVH := SendMessage(LVM_GETHEADER,,,, "ahk_id " this.hLV)
         
-        this.CtrlName[hLV] := "LV"
-        this.CtrlName[hEdit] := "Edit"
+        this.CtrlName[this.hLV] := "LV"
+        this.CtrlName[this.hEdit] := "Edit"
         
         this.RegisterHwnd()
         
         ; Copy the ImageList, otherwise it gets destroyed the first time a ListView
         ; is destroyed.  LVS_SHAREIMAGELIST would let controls share the ImageList,
         ; but it's still destroyed when the last ListView is destroyed.
-        LV_SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", this.ImageList, "ptr"))
+        this.LV.SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", this.ImageList, "ptr"))
         
         this.Populate()
     }
@@ -100,12 +94,11 @@ class TreeListView extends TreeListView._Base
     }
     
     AfterPopulate() {
-        LV_ModifyCol()
+        this.LV.ModifyCol()
     }
     
     Reset() {
-        restore_gui_on_return := this.LV_BeginScope()
-        LV_Delete()
+        this.LV.Delete()
         this.Populate()
     }
     
@@ -113,7 +106,7 @@ class TreeListView extends TreeListView._Base
     
     InsertRow(r, node) {
         opt := node.expandable ? "Icon" (node.expanded ? 3 : 2) : ""
-        LV_Insert(r, opt, node.values*)
+        this.LV.Insert(r, opt, node.values*)
         this.LV_SetItemParam(r, &node)
         if node.level
             this.LV_SetItemIndent(r, node.level)
@@ -124,7 +117,7 @@ class TreeListView extends TreeListView._Base
     }
     RemoveRow(r) {
         node := this.NodeFromRow(r)
-        LV_Delete(r)
+        this.LV.Delete(r)
         if node.expanded
             this.RemoveChildren(r, node)
         return node
@@ -138,7 +131,7 @@ class TreeListView extends TreeListView._Base
         return r
     }
     RemoveChildren(r, node) {
-        Loop % node.children.Length()
+        Loop node.children.Length()
             this.RemoveRow(r)
     }
     
@@ -146,14 +139,14 @@ class TreeListView extends TreeListView._Base
         node := this.NodeFromRow(r)
         if !node.expandable
             return
-        GuiControl -Redraw, % this.hLV
+        this.LV.opt("-Redraw")
         if node.expanded := !node.expanded
             this.InsertChildren(r+1, node)
         else
             this.RemoveChildren(r+1, node)
-        LV_Modify(0, "-Select")
-        LV_Modify(r, "Select Focus Icon" (2+node.expanded))
-        GuiControl +Redraw, % this.hLV
+        this.LV.Modify(0, "-Select")
+        this.LV.Modify(r, "Select Focus Icon" (2+node.expanded))
+        this.LV.opt("+Redraw")
     }
 
     NodeFromRow(r) {
@@ -187,18 +180,14 @@ class TreeListView extends TreeListView._Base
         parent.children.InsertAt(i, child)
         child.level := (parent == this.root) ? 0 : parent.level + 1
         this.LinkNode(child)
-        if r {
-            restore_gui_on_return := this.LV_BeginScope()
+        if r
             this.InsertRow(r, child)
-        }
     }
     RemoveChild(parent, i) {
         if !(child := parent.children.RemoveAt(i))
             throw Exception("No child at index " i, -1)
-        if (r := this.RowFromNode(child)) {
-            restore_gui_on_return := this.LV_BeginScope()
+        if (r := this.RowFromNode(child))
             this.RemoveRow(r)
-        }
         this.UnlinkNode(child)
     }
     
@@ -248,8 +237,7 @@ class TreeListView extends TreeListView._Base
         VarSetCapacity(rect, 16, 0)
         NumPut(LVIR_LABEL, rect, 0, "int")
         NumPut(column-1, rect, 4, "int")
-        SendMessage % LVM_GETSUBITEMRECT, % r-1, % &rect,, % "ahk_id " this.hLV
-        if !ErrorLevel
+        if !SendMessage(LVM_GETSUBITEMRECT, r-1, &rect,, "ahk_id " this.hLV)
             return false
         this.EditRow := r
         this.EditColumn := column
@@ -263,7 +251,7 @@ class TreeListView extends TreeListView._Base
             if (delta > rL)
                 delta := rL
             static LVM_SCROLL := 0x1014
-            SendMessage % LVM_SCROLL, % delta, 0,, % "ahk_id " this.hLV
+            SendMessage(LVM_SCROLL, delta, 0,, "ahk_id " this.hLV)
             NumPut(rL - delta, rect, 0, "int")
             NumPut(rR - delta, rect, 8, "int")
             Sleep 100
@@ -280,50 +268,48 @@ class TreeListView extends TreeListView._Base
             rW := client_width
         ; Move the edit control into position and show it
         this.EditText := "" node.values[column]
-        GuiControl,, % this.hEdit, % this.EditText
-        GuiControl Move, % this.hEdit, x%rL% y%rT% w%rW% h%rH%
-        GuiControl Show, % this.hEdit
-        GuiControl Focus, % this.hEdit
+        this.Edit.Value := this.EditText
+        this.Edit.Move("x" rL " y" rT " w" rW " h" rH)
+        this.Edit.Visible := true
+        this.Edit.Focus()
         static EM_SETSEL := 0xB1
-        SendMessage % EM_SETSEL, 0, -1,, % "ahk_id " this.hEdit
+        SendMessage(EM_SETSEL, 0, -1,, "ahk_id " this.hEdit)
         return true
     }
     CancelEdit() {
         this.EditRow := ""
         this.EditColumn := ""
-        GuiControl Hide, % this.hEdit
+        this.Edit.Visible := false
     }
     SaveEdit(reason:="") {
-        restore_gui_on_return := this.LV_BeginScope()
         if !(r := this.EditRow)
             throw Exception("Not editing", -1)
-        GuiControlGet value,, % this.hEdit
+        value := this.Edit.Value
         node := this.NodeFromRow(r)
         if this.EditText == "" value  ; Avoid erasing objects.
             return this.CancelEdit()
         c := this.EditColumn
-        GuiControl -Redraw, % this.hLV
+        this.LV.opt("-Redraw")
         this.EditRow := ""
         this.EditColumn := ""
-        GuiControl Hide, % this.hEdit
+        this.Edit.Visible := false
         this.SetNodeValue(node, c, value)
-        GuiControl +Redraw, % this.hLV
+        this.LV.opt("+Redraw")
     }
     IsEditing() {
-        return DllCall("IsWindowVisible", "ptr", this.hEdit)
+        return this.Edit.Visible
     }
     
     SetNodeValue(node, column, value) {
         value := node.values[column] := value
         if r := this.RowFromNode(node)
-            LV_Modify(r, "Col" column, value)
+            this.LV.Modify(r, "Col" column, value)
     }
     
     RefreshValues(node) {
         if r := this.RowFromNode(node) {
-            restore_gui_on_return := this.LV_BeginScope()
             opt := "Icon" (node.expandable ? (node.expanded ? 3 : 2) : 1)
-            LV_Modify(r, opt, node.values*)
+            this.LV.Modify(r, opt, node.values*)
         }
     }
     
@@ -332,9 +318,8 @@ class TreeListView extends TreeListView._Base
     ;{ Keyboard Handling
     
     OnKeyDown(ctrl, key) {
-        restore_gui_on_return := this.LV_BeginScope()
         if (ctrl = "LV") {
-            if !(r := LV_GetNext(0, "F")) {
+            if !(r := this.LV.GetNext(0, "F")) {
                 if (key = "Tab") {
                     this.LV_Focus(1)
                     return true
@@ -343,7 +328,7 @@ class TreeListView extends TreeListView._Base
             }
             node := this.NodeFromRow(r)
         }
-        if IsFunc(this[ctrl "_Key_" key])
+        if type(this[ctrl "_Key_" key]) = "Func"
             return this[ctrl "_Key_" key](r, node)
     }
     
@@ -383,7 +368,7 @@ class TreeListView extends TreeListView._Base
         }
         if node.expandable && !node.expanded
             this.ExpandContract(r)
-        else if (r = LV_GetCount())
+        else if (r = this.LV.GetCount())
             return ; Allow default handling
         this.LV_Focus(r+1)
         return true
@@ -421,7 +406,7 @@ class TreeListView extends TreeListView._Base
         ; Else if c is omitted, edit the first/last column of r.
         if (r == "")
             r := this.EditRow, (c != "") || (c := this.EditColumn)
-        (r != "") || (r := LV_GetNext(,"F"))
+        (r != "") || (r := this.LV.GetNext(,"F"))
         (c != "") || (c := delta>0 ? this.MinEditColumn-1 : this.MaxEditColumn+1)
         loop {
             c += delta
@@ -435,10 +420,11 @@ class TreeListView extends TreeListView._Base
     }
     
     EditNextRow(delta:=1, r:="", c:="") {
-        (r != "") || (r := this.EditRow) || (r := LV_GetNext(,"F"))
+        (r != "") || (r := this.EditRow) || (r := this.LV.GetNext(,"F"))
+        count := this.LV.GetCount()
         loop {
             r += delta
-            if (r > LV_GetCount() || r < 1)
+            if (r > count || r < 1)
                 return
         }
         until c="" ? this.EditNextColumn(delta, r) : this.BeginEdit(r, c)
@@ -458,7 +444,7 @@ class TreeListView extends TreeListView._Base
     ;{ General Control Functionality
     
     EnableRedraw(enable) {
-        GuiControl % (enable ? "+" : "-") "Redraw", % this.hLV
+        this.LV.opt((enable ? "+" : "-") "Redraw")
     }
     
     ScrollPos {
@@ -468,23 +454,21 @@ class TreeListView extends TreeListView._Base
         set {
             static LVM_GETITEMPOSITION := 0x1010, LVM_SCROLL := 0x1014
             VarSetCapacity(pt, 8, 0)
-            SendMessage % LVM_GETITEMPOSITION, % this.ScrollPos, % &pt,, % "ahk_id " this.hLV
+            SendMessage(LVM_GETITEMPOSITION, this.ScrollPos, &pt,, "ahk_id " this.hLV)
             oldPixelY := NumGet(pt, 4, "int")
-            SendMessage % LVM_GETITEMPOSITION, % value, % &pt,, % "ahk_id " this.hLV
+            r := SendMessage(LVM_GETITEMPOSITION, value, &pt,, "ahk_id " this.hLV)
             newPixelY := NumGet(pt, 4, "int")
-            if (ErrorLevel = 1)
-                SendMessage % LVM_SCROLL, 0, % newPixelY - oldPixelY,, % "ahk_id " this.hLV
+            if (r = 1)
+                SendMessage(LVM_SCROLL, 0, newPixelY - oldPixelY,, "ahk_id " this.hLV)
             return value
         }
     }
     
     FocusedNode {
         get {
-            restore_gui_on_return := this.LV_BeginScope()
-            return (r := LV_GetNext(,"F")) ? this.NodeFromRow(r) : ""
+            return (r := this.LV.GetNext(,"F")) ? this.NodeFromRow(r) : ""
         }
         set {
-            restore_gui_on_return := this.LV_BeginScope()
             if !(r := this.RowFromNode(value))
                 return ""
             this.LV_Focus(r)
@@ -512,14 +496,13 @@ class TreeListView extends TreeListView._Base
         VarSetCapacity(hti, 24, 0)
         NumPut(lParam & 0xFFFF, hti, 0, "short")
         NumPut(lParam >> 16, hti, 4, "short")
-        SendMessage % LVM_SUBITEMHITTEST, 0, % &hti,, % "ahk_id " this.hLV
+        SendMessage(LVM_SUBITEMHITTEST, 0, &hti,, "ahk_id " this.hLV)
         where := NumGet(hti, 8, "int")
         r := NumGet(hti, 12, "int") + 1
         if (!r)
             return
-        restore_gui_on_return := this.LV_BeginScope()
         if (where = LVHT_ONITEMICON) {
-            GuiControl Focus, % this.hLV
+            this.LV.Focus()
             this.ExpandContract(r)
             return true
         }
@@ -528,7 +511,7 @@ class TreeListView extends TreeListView._Base
                 this.OnDoubleClick(node)
             return true
         }
-        if (where = LVHT_ONITEMLABEL && LV_GetNext(r-1) == r) { ; Was already selected.
+        if (where = LVHT_ONITEMLABEL && this.LV.GetNext(r-1) == r) { ; Was already selected.
             c := NumGet(hti, 16, "int") + 1
             this.BeginEdit(r, c)
             return true
@@ -580,31 +563,28 @@ class TreeListView extends TreeListView._Base
     ;{ ListView Utility
     
     LV_Focus(row) {
-        ; Caller must ensure the Gui and ListView are set as default
-        LV_Modify(0, "-Select")
-        LV_Modify(row, "Focus Select")
+        this.LV.Modify(0, "-Select")
+        this.LV.Modify(row, "Focus Select")
     }
     
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
     LV_GetColumnWidth(column) {
         static LVM_GETCOLUMNWIDTH := 0x101D
-        SendMessage % LVM_GETCOLUMNWIDTH, % column-1, 0,, % "ahk_id " this.hLV
-        return ErrorLevel
+        return SendMessage(LVM_GETCOLUMNWIDTH, column-1, 0,, "ahk_id " this.hLV)
     }
     LV_SetItemIndent(row, numIcons) {
         ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
         static OffIndent := 24 + (A_PtrSize * 3)
         this.LV_LVITEM(LVITEM, 0x00000010, row) ; LVIF_INDENT
         NumPut(numIcons, LVITEM, OffIndent, "Int")
-        SendMessage, 0x1006, 0, % &LVITEM, , % "ahk_id " this.hLV
-        return ErrorLevel
+        return SendMessage(0x1006, 0, &LVITEM, , "ahk_id " this.hLV)
     }
     LV_GetItemParam(row) {
         ; LVM_GETITEM -> http://msdn.microsoft.com/en-us/library/bb774953(v=vs.85).aspx
         static LVM_GETITEM := A_IsUnicode ? 0x104B : 0x1005 ; LVM_GETITEMW : LVM_GETITEMA
         static OffParam := 24 + (A_PtrSize * 2)
         this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
-        SendMessage, % LVM_GETITEM, 0, % &LVITEM, , % "ahk_id " this.hLV
+        SendMessage(LVM_GETITEM, 0, &LVITEM, , "ahk_id " this.hLV)
         return NumGet(LVITEM, OffParam, "UPtr")
     }
     LV_SetItemParam(row, value) {
@@ -612,8 +592,7 @@ class TreeListView extends TreeListView._Base
         static OffParam := 24 + (A_PtrSize * 2)
         this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
         NumPut(value, LVITEM, OffParam, "UPtr")
-        SendMessage, 0x1006, 0, % &LVITEM, , % "ahk_id " this.hLV
-        return ErrorLevel
+        return SendMessage(0x1006, 0, &LVITEM, , "ahk_id " this.hLV)
     }
     LV_FindItemParam(param, start := 0) { ; Based on LV_EX_FindString
         ; LVM_FINDITEMA = 0x100D -> http://msdn.microsoft.com/en-us/library/bb774903
@@ -621,8 +600,8 @@ class TreeListView extends TreeListView._Base
         VarSetCapacity(LVFI, LVFISize, 0) ; LVFINDINFO
         NumPut(0x1, LVFI, 0, "UInt") ; LVFI_PARAM
         NumPut(param, LVFI, A_PtrSize * 2, "Ptr") ; lParam
-        SendMessage, 0x100D, % (start - 1), % &LVFI, , % "ahk_id " this.hLV
-        return (ErrorLevel > 0x7FFFFFFF ? 0 : ErrorLevel + 1)
+        r := SendMessage(0x100D, (start - 1), &LVFI, , "ahk_id " this.hLV)
+        return (r > 0x7FFFFFFF ? 0 : r + 1)
     }
     LV_LVITEM(ByRef LVITEM, mask := 0, row := 1, col := 1) {
         static LVITEMSize := 48 + (A_PtrSize * 3)
@@ -633,25 +612,6 @@ class TreeListView extends TreeListView._Base
     ;}
     
     ;{ General Utility
-    
-    LV_BeginScope() {
-        scope := new this.GuiScope()
-        Gui % this.hGui ":Default"
-        Gui ListView, % this.hLV
-        return scope
-    }
-    
-    class GuiScope {
-        __New() {
-            this.prev_gui := A_DefaultGui
-            this.prev_lv := A_DefaultListView ; Only matters if prev_gui = our gui.
-        }
-        __Delete() {
-            Gui % this.prev_gui ":Default"
-            if (this.prev_lv != "")
-                Gui ListView, % this.prev_lv
-        }
-    }
     
     class _Base {
         __call(name:="") {
