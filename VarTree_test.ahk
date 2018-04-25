@@ -19,13 +19,17 @@ test_vars := "
 test_obj := {}
 Loop Parse, % test_vars, `n
     test_obj[A_LoopField] := %A_LoopField%
-vtg := new VarTreeGui(new VarTreeObjectNode(test_obj))
-vtg.OnContextMenu := Func("ContextMenu")
-vtg.OnDoubleClick := Func("EditNode")
-vtg.Show(), vtg := ""
+ShowGuiForObject(test_obj)
 while VarTreeGui.Instances.Length()
     Sleep 1000
 ExitApp
+
+ShowGuiForObject(obj) {
+    vtg := new VarTreeGui(new VarTreeObjectNode(obj))
+    vtg.OnContextMenu := Func("ContextMenu")
+    vtg.OnDoubleClick := Func("EditNode")
+    vtg.Show()
+}
 
 ContextMenu(vtg, node, isRightClick, x, y) {
     try Menu OEmenu, DeleteAll
@@ -37,13 +41,13 @@ ContextMenu(vtg, node, isRightClick, x, y) {
 
 EditNode(vtg, node) {
     if IsObject(node.value) {
-        gui := new VarTreeGui(new VarTreeObjectNode(node.value))
+        ShowGuiForObject(node.value)
     }
     else {
         gui := new VarEditGui({name: node.values[1], value: node.value, type: vt_type(node.value)})
         gui.OnSave := Func("ED_Save").Bind(vtg, node)
+        gui.Show()
     }
-    gui.Show()
 }
 
 ED_Save(vtg, node, ed, value, type) {
