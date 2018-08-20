@@ -103,7 +103,7 @@ class DvPropertyParentNode extends DvNodeBase
                     continue
                 }
                 if (prop.getAttribute("name") = children[nc].name) {
-                    children[nc].Update(tlv, prop)
+                    children[nc].Update(tlv, prop, args)
                     ++nc, ++np
                     continue
                 }
@@ -205,7 +205,8 @@ class DvPropertyNode extends DvPropertyParentNode
         this.value := value := DBGp_Base64UTF8Decode(this.xml.text)
     }
     
-    Update(tlv, prop:="") {
+    Update(tlv, prop:="", args:="") {
+        (args != "") && this.args := args
         had_children := this.xml.getAttribute("children")
         if !prop
             || this.expanded  ; Children were visible.
@@ -232,6 +233,7 @@ class DvPropertyNode extends DvPropertyParentNode
 class DvContextNode extends DvPropertyParentNode
 {
     static expandable := true
+    static depth := 0
     
     __new(dbg, context) {
         this.dbg := dbg
@@ -245,14 +247,14 @@ class DvContextNode extends DvPropertyParentNode
     }
     
     GetProperties() {
-        this.dbg.context_get("-c" this.context, response)
+        this.dbg.context_get("-c" this.context " -d" this.depth, response)
         xml := DvLoadXml(response)
         return xml.selectNodes("/response/property")
     }
     
     GetChildren() {
         props := this.GetProperties()
-        return DvPropertyNode.FromXmlNodes(props, this.dbg, "-c" this.context)
+        return DvPropertyNode.FromXmlNodes(props, this.dbg, "-c" this.context " -d" this.depth)
     }
     
     GetWindowTitle() {
@@ -261,7 +263,7 @@ class DvContextNode extends DvPropertyParentNode
     
     Update(tlv) {
         props := this.GetProperties()
-        this.UpdateChildren(tlv, props, "-c" this.context)
+        this.UpdateChildren(tlv, props, "-c" this.context " -d" this.depth)
     }
 }
 
