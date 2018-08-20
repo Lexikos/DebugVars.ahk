@@ -206,14 +206,22 @@ class DvPropertyNode extends DvPropertyParentNode
     
     Update(tlv, prop:="") {
         had_children := this.xml.getAttribute("children")
-        if !prop || prop.getAttribute("children") && !prop.selectSingleNode("property")
+        if !prop
+            || this.expanded  ; Children were visible.
+                && prop.getAttribute("children")  ; Still has children.
+                && !prop.selectSingleNode("property")  ; None present in the XML.
             prop := this.GetProperty()
-        else
+        else {
+            if had_children && !this.expanded {
+                ObjDelete(this, "expanded")  ; Force update on next expansion.
+                ObjDelete(this, "children")
+            }
             this.xml := prop
+        }
         props := prop.selectNodes("property")
         value2 := this.values[2]
         this.value := props.length ? "" : DBGp_Base64UTF8Decode(prop.text)
-        if !(this.values[2] "" ==  "" value2) ; Prevent unnecessary redraw and flicker.
+        if !(this.values[2] "" == "" value2) ; Prevent unnecessary redraw and flicker.
             || (had_children != prop.getAttribute("children"))
             tlv.RefreshValues(this)
         this.UpdateChildren(tlv, props)
