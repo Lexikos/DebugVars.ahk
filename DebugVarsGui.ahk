@@ -2,11 +2,23 @@
 #Include VarTreeGui.ahk
 #Include VarEditGui.ahk
 
+DvArg(dbg, a) { ; Quote parameter value 'a' if appropriate/supported
+    if !InStr(a, " ")
+        return a
+    ; Parameter values including a space "must" be quoted, according to
+    ; the spec (draft 21, 2018-01-09), but this requires v1.1.30+.
+    if !ObjHasKey(dbg, "can_quote") { ; Support not yet determined
+        dbg.feature_get("-n ""feature_get""", response)
+        ObjRawSet(dbg, "can_quote", InStr(response, "supported=""1""") != 0)
+    }
+    return dbg.can_quote ? """" RegExReplace(a, "[""\\]", "\$0") """" : a
+}
+
 DvInspectProperty(dbg, fullname, extra_args:="", show_opt:="") {
     dbg.feature_set("-n max_depth -v 1")
     ; 1MB seems reasonably permissive.  Note that -m 0 (unlimited
     ; according to the spec) doesn't work with v1.1.24.02 and earlier.
-    dbg.property_get("-m 1048576 -n " fullname (extra_args="" ? "" : " " extra_args), response)
+    dbg.property_get("-m 1048576 -n" DvArg(dbg, fullname) (extra_args="" ? "" : " " extra_args), response)
     dbg.feature_set("-n max_depth -v 0")
     prop := DvLoadXml(response).selectSingleNode("/response/property")
     
@@ -49,7 +61,7 @@ DvSetProperty(dbg, fullname, ByRef value, type, args:="", ByRef response:="") {
         data := value
     else
         data := DBGp_Base64UTF8Encode(value)
-    dbg.property_set("-n" fullname " -t" type (args="" ? "" : " " args) " -- " data, response)
+    dbg.property_set("-n" DvArg(dbg, fullname) " -t" type (args="" ? "" : " " args) " -- " data, response)
 }
 
 class DvNodeBase extends TreeListView._Base
@@ -160,7 +172,7 @@ class DvPropertyNode extends DvPropertyParentNode
     
     GetProperty() {
         this.dbg.feature_set("-n max_depth -v 1")
-        this.dbg.property_get("-n" this.fullname (this.args="" ? "" : " " this.args), response)
+        this.dbg.property_get("-n" DvArg(this.dbg, this.fullname) (this.args="" ? "" : " " this.args), response)
         this.dbg.feature_set("-n max_depth -v 0")
         xml := DvLoadXml(response)
         return this.xml := xml.selectSingleNode("/response/property")
