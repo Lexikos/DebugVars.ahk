@@ -12,26 +12,22 @@
         vtg.OnContextMenu := Func(vtg, node, isRightClick, x, y)
         vtg.OnDoubleClick := Func(vtg, node)
 */
-class VarTreeGui extends TreeListView._Base
+class VarTreeGui extends Gui
 {
-    static Instances := {} ; Hwnd:Object map of *visible* instances
-    
     __New(RootNode) {
-        Gui := GuiCreate("+Resize -DPIScale")
-        Gui.OnEvent("Close", Func("VarTreeGuiClose"))
-        Gui.OnEvent("Escape", Func("VarTreeGuiEscape"))
-        Gui.OnEvent("Size", Func("VarTreeGuiSize"))
-        Gui.OnEvent("ContextMenu", Func("VarTreeGuiContextMenu"))
-        Gui.MarginX := 0
-        Gui.MarginY := 0
-        this.Gui := Gui
-        this.TLV := new this.Control(Gui, RootNode
-            , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " LV0x10000 -LV0x10 -Multi", "Name|Value") ; LV0x10 = LVS_EX_HEADERDRAGDROP
+        super.__New("+Resize -DPIScale",, this)
+        this.OnEvent("Escape", "Hide")
+        this.OnEvent("Size", "Resized")
+        this.OnEvent("ContextMenu", "ContextMenu")
+        this.MarginX := 0
+        this.MarginY := 0
+        this.TLV := VarTreeGui.Control(this, RootNode
+            , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " LV0x10000 -LV0x10 -Multi", ["Name","Value"]) ; LV0x10 = LVS_EX_HEADERDRAGDROP
     }
     
     class Control extends TreeListView
     {
-        static COL_NAME := 1, COL_VALUE := 2
+        static prototype.COL_NAME := 1, prototype.COL_VALUE := 2
         
         MinEditColumn := 2
         MaxEditColumn := 2
@@ -48,7 +44,7 @@ class VarTreeGui extends TreeListView._Base
         }
         
         ExpandContract(r) {
-            base.ExpandContract(r)
+            super.ExpandContract(r)
             this.AutoSizeValueColumn()  ; Adjust for +/-scrollbars
         }
         
@@ -82,54 +78,21 @@ class VarTreeGui extends TreeListView._Base
         }
         
         OnDoubleClick(node) {
-            if (vtg := VarTreeGui.Instances[this.hGui]) && vtg.OnDoubleClick
-                vtg.OnDoubleClick(node)
+            g := GuiFromHwnd(this.hGui)
+            if g && g.HasMethod('OnDoubleClick')
+                g.OnDoubleClick(node)
         }
     }
     
-    Show(options:="") {
-        this.RegisterHwnd()
-        this.Gui.Show(options)
-    }
-    
-    Hide() {
-        this.Gui.Hide()
-        this.UnregisterHwnd()
-    }
-    
-    RegisterHwnd() {
-        VarTreeGui.Instances[this.Gui.Hwnd] := this
-    }
-    
-    UnregisterHwnd() {
-        VarTreeGui.Instances.Delete(this.Gui.Hwnd)
-    }
-    
-    __Delete() {
-        this.Gui.Destroy()
-    }
-    
     ContextMenu(ctrl, eventInfo, isRightClick, x, y) {
-        if (ctrl != this.TLV.LV || !this.OnContextMenu)
+        if (ctrl != this.TLV.LV || !this.HasMethod('OnContextMenu'))
             return
         node := eventInfo ? this.TLV.NodeFromRow(eventInfo) : ""
         this.OnContextMenu(node, isRightClick, x, y)
     }
-}
-
-VarTreeGuiClose(Gui) {
-    VarTreeGui.Instances[Gui.hwnd].UnregisterHwnd()
-}
-
-VarTreeGuiEscape(Gui) {
-    VarTreeGui.Instances[Gui.hwnd].Hide()
-}
-
-VarTreeGuiSize(Gui, e, w, h) {
-    Gui.Control["SysListView321"].Move("w" w " h" h)
-    VarTreeGui.Instances[Gui.hwnd].TLV.AutoSizeValueColumn()
-}
-
-VarTreeGuiContextMenu(Gui, prms*) {
-    VarTreeGui.Instances[Gui.hwnd].ContextMenu(prms*)
+    
+    Resized(e, w, h) {
+        this["SysListView321"].Move(,, w, h)
+        this.TLV.AutoSizeValueColumn()
+    }
 }

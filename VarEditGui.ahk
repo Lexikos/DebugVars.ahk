@@ -138,9 +138,9 @@ class VarEditGui extends Gui {
     }
     
     ChangeType(*) {
-        type := this.cType.Text
-        this.preferredType := type
-        this.CheckWantReturn(type)
+        vtype := this.cType.Text
+        this.preferredType := vtype
+        this.CheckWantReturn(vtype)
         if !this.Dirty
             this.BeginEdit()
     }

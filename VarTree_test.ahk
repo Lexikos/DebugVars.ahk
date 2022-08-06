@@ -6,7 +6,7 @@ TODO:
 */
 
 #Warn , StdOut
-global A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
+A_Args := [["line1`nline2","B"],["C",["D"],"E"]]
 
 test_vars := "
     (LTrim
@@ -18,22 +18,19 @@ test_vars := "
     )"
 test_obj := {}
 Loop Parse test_vars, "`n"
-    test_obj[A_LoopField] := %A_LoopField%
+    test_obj.%A_LoopField% := %A_LoopField%
 ShowGuiForObject(test_obj)
-while VarTreeGui.Instances.Length()
-    Sleep 1000
-ExitApp
 
 ShowGuiForObject(obj) {
-    vtg := new VarTreeGui(new VarTreeObjectNode(obj))
-    vtg.OnContextMenu := Func("ContextMenu")
-    vtg.OnDoubleClick := Func("EditNode")
+    vtg := VarTreeGui(VarTreeObjectNode(obj))
+    vtg.OnContextMenu := ContextMenu
+    vtg.OnDoubleClick := EditNode
     vtg.Show()
 }
 
 ContextMenu(vtg, node, isRightClick, x, y) {
-    m := MenuCreate()
-    m.Add("Inspect", Func("EditNode").Bind(vtg, node))
+    m := Menu()
+    m.Add("Inspect", (*) => EditNode(vtg, node))
     m.Show(x, y)
 }
 
@@ -42,21 +39,17 @@ EditNode(vtg, node) {
         ShowGuiForObject(node.value)
     }
     else {
-        gui := new VarEditGui({name: node.values[1], value: node.value, type: type(node.value)})
-        gui.OnSave := Func("ED_Save").Bind(vtg, node)
-        gui.Show()
+        veg := VarEditGui({name: node.values[1], value: node.value, type: type(node.value)})
+        veg.OnSave := ED_Save.Bind(vtg, node)
+        veg.Show()
     }
 }
 
 ED_Save(vtg, node, ed, value, type) {
-    if (type = "integer")
-        value += 0
-    else if (type = "float")
-        value += 0.0
-    node.SetValue(value)
-    vtg.EnableRedraw(false)
-    vtg.Reset()
-    vtg.EnableRedraw(true)
+    node.SetValue(%type%(value))
+    vtg.TLV.EnableRedraw(false)
+    vtg.TLV.Reset()
+    vtg.TLV.EnableRedraw(true)
     ed.Var.value := value
     ed.Var.type := type
 }
