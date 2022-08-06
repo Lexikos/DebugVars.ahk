@@ -3,7 +3,7 @@
     VarEditGui
     
     Public interface:
-        ed := new VarEditGui({Name, Value, Type, ReadOnly})
+        ed := VarEditGui({Name, Value, Type, ReadOnly})
         ed.SetVar({Name, Value, Type, ReadOnly)
         ed.Show()
         ed.Cancel()
@@ -12,12 +12,12 @@
         ed.OnDirty := Func(ed)
         ed.OnCancel := Func(ed)
 */
-class VarEditGui {
+class VarEditGui extends Gui {
     __New(aVar:="") {
         editOpt := ""
         if aVar && (aVar.type = "integer" || aVar.type = "float")
             editOpt := "r1 Multi" ; Default to one line.
-        this.CreateGui(editOpt)
+        this._CreateGui(editOpt)
         if aVar
             this.SetVar(aVar)
     }
@@ -27,71 +27,63 @@ class VarEditGui {
         this.Var := aVar
         this.cSave.Enabled := false
         
-        type := aVar.type
+        vtype := aVar.type
         value := aVar.value
-        readonly := aVar.readonly
+        readonly := aVar.HasProp('readonly') && aVar.readonly
         
-        this.cType.Delete()
+        types := []
         if readonly
-            types := type
+            types.Push vtype
         else {
             ; 'undefined' can't be set by the user, but may be the initial type
-            types := (type = "undefined" ? "undefined|" : "") "string"
+            if vtype = "undefined"
+                types.Push "undefined"
+            types.Push "string"
             if VarEditGui_isInt64(value)
-                types .= "|integer" (InStr(value,"0x") ? "" : "|float")
-            else if VarEditGui_isFloat(value)
-                types .= "|float"
+                types.Push "integer"
+            if IsNumber(value) && !InStr(value,"0x")
+                types.Push "float"
         }
+        this.cType.Delete()
         this.cType.Add(types)
-        this.cType.Choose(type)
-        this.preferredType := type
+        this.cType.Choose(vtype)
+        this.preferredType := vtype
         
         this.cEdit.Opt((readonly ? "+" : "-") "ReadOnly")
         
         this.cEdit.Value := value
         
-        this[InStr(value,"`r`n") ? "cCRLF" : "cLF"].Value := true
+        this.%InStr(value,"`r`n") ? "cCRLF" : "cLF"%.Value := true
         this.DisEnableEOLControls(value, readonly)
-        this.CheckWantReturn(type)
+        this.CheckWantReturn(vtype)
         
         this.UpdateTitle()
     }
     
-    CreateGui(editOpt:="") {
-        Gui := GuiCreate("+Resize")
-        Gui.OnEvent("Close", "VarEditGui_OnClose")
-        Gui.OnEvent("Escape", "VarEditGui_OnEscape")
-        Gui.OnEvent("Size", "VarEditGui_OnSize")
-        this.Gui := Gui
+    _CreateGui(editOpt:="") {
+        super.__new("+Resize",, this)
+        this.OnEvent("Escape", "Hide")
+        this.OnEvent("Size", "GuiSize")
         
-        this.cEdit := Gui.AddEdit("w300 r10 " editOpt)
-        this.cEdit.OnEvent("Change", Func("VarEditGui_OnChangeValue"))
+        this.cEdit := this.AddEdit("w300 r10 " editOpt)
+        this.cEdit.OnEvent("Change", "ChangeValue")
         
-        pos := this.cEdit.Pos
-        this.marginX := pos.X, this.marginY := pos.Y
+        this.cType := this.AddDDL("w70", ["undefined"])
+        this.cType.OnEvent("Change", "ChangeType")
         
-        this.cType := Gui.AddDDL("w70", "undefined||")
-        this.cType.OnEvent("Change", Func("VarEditGui_OnChangeType"))
-        
-        cH := this.cType.Pos.H
+        this.cType.GetPos(,,, &cH)
         this.footerH := cH
         
-        this.cLF := Gui.AddRadio("x+m h" cH, "LF")
-        this.cCRLF := Gui.AddRadio("x+0 h" cH, "CR+LF")
-        this.cLF.OnEvent("Click", Func("VarEditGui_OnChangeEOL"))
-        this.cCRLF.OnEvent("Click", Func("VarEditGui_OnChangeEOL"))
+        this.cLF := this.AddRadio("x+m h" cH, "LF")
+        this.cCRLF := this.AddRadio("x+0 h" cH, "CR+LF")
+        this.cLF.OnEvent("Click", "ChangeEOL")
+        this.cCRLF.OnEvent("Click", "ChangeEOL")
         
-        this.cSave := Gui.AddButton("x+m Disabled", "&Save")
-        this.cSave.OnEvent("Click", Func("VarEditGui_OnClickSave"))
+        this.cSave := this.AddButton("x+m Disabled", "&Save")
+        this.cSave.OnEvent("Click", "SaveEdit")
         
-        pos := this.cSave.Pos
-        pos.X += pos.W + this.marginX
-        Gui.Opt("+MinSize" pos.X "x")
-    }
-    
-    Show(options:="") {
-        VarEditGui.Instances[this.Gui.Hwnd] := this
-        this.Gui.Show(options)
+        this.cSave.GetPos(&x,, &w)
+        this.Opt("+MinSize" (x + w + this.marginX) "x")
     }
     
     Cancel() {
@@ -101,39 +93,26 @@ class VarEditGui {
             this.Hide()
     }
     
-    Hide() {
-        this.Gui.Hide()
-        VarEditGui.RevokeHwnd(this.Gui.Hwnd)
-    }
-    
-    RevokeHwnd(hwnd) {
-        this.Instances.Delete(hwnd)
-    }
-    
-    __Delete() {
-        this.Gui.Destroy()
-    }
-    
-    GuiSize(w, h) {
+    GuiSize(state, w, h) {
         cW := w - this.marginX*2
         cH := h - this.marginY*3 - this.footerH
-        this.cEdit.Move("w" cW " h" cH)
+        this.cEdit.Move(,, cW, cH)
         y := cH + this.marginY*2
-        this.cType.Move("y" y)
-        this.cLF.Move("y" y)
-        this.cCRLF.Move("y" y)
-        pos := this.cSave.Pos
-        x := w - this.marginX - pos.W
-        this.cSave.Move("x" x " y" y-2)
+        this.cType.Move(, y)
+        this.cLF.Move(, y)
+        this.cCRLF.Move(, y)
+        this.cSave.GetPos(,, &sW)
+        x := w - this.marginX - sW
+        this.cSave.Move(x, y-2)
     }
     
     UpdateTitle() {
-        this.Gui.Title := "Inspector - "
+        this.Title := "Inspector - "
             . this.Var.name (this.Dirty ? " (modified)" : "")
     }
     
     BeginEdit() {
-        if !(this.OnDirty && this.OnDirty()) {
+        if !(this.HasProp('OnDirty') && this.OnDirty()) {
             this.Dirty := true
             this.cSave.Enabled := true
             this.UpdateTitle()
@@ -141,51 +120,53 @@ class VarEditGui {
     }
     
     CancelEdit() {
-        if !(this.OnCancel && this.OnCancel())
+        if !(this.HasProp('OnCancel') && this.OnCancel())
             this.SetVar(this.Var)
     }
     
-    SaveEdit() {
+    SaveEdit(*) {
         value := this.cEdit.Value
         if this.cCRLF.Value
             value := StrReplace(value, "`n", "`r`n")
-        if !this.OnSave(value, this.cType.Value)
+        if !this.OnSave(value, this.cType.Text)
             this.SetVar(this.Var)
     }
     
-    ChangeEOL() {
+    ChangeEOL(*) {
         if !this.Dirty
             this.BeginEdit()
     }
     
-    ChangeType() {
-        type := this.cType.Value
+    ChangeType(*) {
+        type := this.cType.Text
         this.preferredType := type
         this.CheckWantReturn(type)
         if !this.Dirty
             this.BeginEdit()
     }
     
-    ChangeValue() {
+    ChangeValue(*) {
         value := this.cEdit.Value
-        this.cType.Delete()
-        if (value = "" || !VarEditGui_isFloat(value) && !VarEditGui_isInt64(value)) {
+        types := []
+        if (value = "" || !IsFloat(value) && !VarEditGui_isInt64(value)) {
             ; Only 'string' is valid for this value
-            this.cType.Add("string||")
+            types.Push "string"
         }
         else {
-            types := "string"
+            types.Push "string"
             if InStr(value, "0x")
-                types .= "|integer||"
+                types.Push "integer"
             else if InStr(value, ".")
-                types .= "|float||"
+                types.Push "float"
             else
-                types .= "|integer||float"
-            this.cType.Add(types)
-            try this.cType.Choose(this.preferredType)
+                types.Push "integer", "float"
         }
+        this.cType.Delete()
+        this.cType.Add(types)
+        try this.cType.Choose(Min(2, types.Length))
+        try this.cType.Choose(this.preferredType)
         this.DisEnableEOLControls(value, false)
-        this.CheckWantReturn(this.cType.Value)
+        this.CheckWantReturn(this.cType.Text)
         if !this.Dirty
             this.BeginEdit()
     }
@@ -205,42 +186,10 @@ class VarEditGui {
     }
 }
 
-VarEditGui_OnChangeValue() {
-    VarEditGui.Instances[WinExist()].ChangeValue()
-}
-VarEditGui_OnChangeType() {
-    VarEditGui.Instances[WinExist()].ChangeType()
-}
-VarEditGui_OnChangeEOL() {
-    VarEditGui.Instances[WinExist()].ChangeEOL()
-}
-VarEditGui_OnClickSave() {
-    VarEditGui.Instances[WinExist()].SaveEdit()
-}
-
 VarEditGui_isInt64(s) {
-    ; Unlike (s+0 != ""), this detects overflow and rules out floating-point.
-    NumPut(0, DllCall("msvcrt\_errno", "ptr"), "int")
-	if A_IsUnicode
-		DllCall("msvcrt\_wcstoi64", "ptr", &s, "ptr*", endp:=0, "int", 0)
-	else
-		DllCall("msvcrt\_strtoi64", "ptr", &s, "ptr*", endp:=0, "int", 0)
+    ; Unlike IsInteger(s), this detects overflow.
+    NumPut("int", 0, DllCall("msvcrt\_errno", "ptr"))
+	DllCall("msvcrt\_wcstoi64", "wstr", s, "wstr*", &suffix:="", "int", 0)
 	return DllCall("msvcrt\_errno", "int*") != 34 ; ERANGE
-		&& StrGet(endp) = "" && s != ""
-}
-
-VarEditGui_isFloat(s) {
-    return s is "float"
-}
-
-VarEditGui_OnClose(g) {
-    VarEditGui.RevokeHwnd(g.hwnd)
-}
-
-VarEditGui_OnEscape(g) {
-    VarEditGui.Instances[g.hwnd].Cancel()
-}
-
-VarEditGui_OnSize(g, state, w, h) {
-    VarEditGui.Instances[g.hwnd].GuiSize(w, h)
+		&& suffix = "" && s != ""
 }
