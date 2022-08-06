@@ -1,17 +1,20 @@
 
-class TreeListView extends TreeListView._Base
+class TreeListView
 {
     static ICON_SIZE := 16
     
-    static FromHwnd  ; Hwnd:Object map of controls/instances
+    static FromHwnd := ""  ; Hwnd:Object map of controls/instances
     
     ; MinEditColumn := 0 ; Disabled
     ; MaxEditColumn := 0
     
-    InitClass() {
+    static Prototype.EditRow := ""
+    
+    static InitClass() {
         if this.FromHwnd
             return
-        this.FromHwnd := {}
+        this.FromHwnd := Map()
+        this.FromHwnd.Default := ""
         
         il := DllCall("comctl32.dll\ImageList_Create"
             , "int", this.ICON_SIZE, "int", this.ICON_SIZE
@@ -29,7 +32,7 @@ class TreeListView extends TreeListView._Base
         OnMessage(0x4E, this.OnWmNotify.Bind(this))
     }
     
-    __New(Gui, RootNode, Options:="", Headers:=" | ") {
+    __New(Gui, RootNode, Options:="", Headers:=[" "," "]) {
         TreeListView.InitClass()
         
         this.root := RootNode
@@ -47,8 +50,9 @@ class TreeListView extends TreeListView._Base
         this.hEdit := this.Edit.Hwnd
         
         static LVM_GETHEADER := 0x101F
-        this.hLVH := SendMessage(LVM_GETHEADER,,,, "ahk_id " this.hLV)
+        this.hLVH := SendMessage(LVM_GETHEADER,,,, this.hLV)
         
+        this.CtrlName := Map(), this.CtrlName.CaseSense := "off"
         this.CtrlName[this.hLV] := "LV"
         this.CtrlName[this.hEdit] := "Edit"
         
@@ -57,7 +61,7 @@ class TreeListView extends TreeListView._Base
         ; Copy the ImageList, otherwise it gets destroyed the first time a ListView
         ; is destroyed.  LVS_SHAREIMAGELIST would let controls share the ImageList,
         ; but it's still destroyed when the last ListView is destroyed.
-        this.LV.SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", this.ImageList, "ptr"))
+        this.LV.SetImageList(DllCall("comctl32.dll\ImageList_Duplicate", "ptr", TreeListView.ImageList, "ptr"))
         
         this.Populate()
     }
@@ -105,7 +109,7 @@ class TreeListView extends TreeListView._Base
     InsertRow(r, node) {
         opt := node.expandable ? "Icon" (node.expanded ? 3 : 2) : ""
         this.LV.Insert(r, opt, node.values*)
-        this.LV_SetItemParam(r, &node)
+        this.LV_SetItemParam(r, ObjPtr(node))
         if node.level
             this.LV_SetItemIndent(r, node.level)
         ++r
@@ -129,7 +133,7 @@ class TreeListView extends TreeListView._Base
         return r
     }
     RemoveChildren(r, node) {
-        Loop node.children.Length()
+        Loop node.children.Length
             this.RemoveRow(r)
     }
     
@@ -149,11 +153,11 @@ class TreeListView extends TreeListView._Base
 
     NodeFromRow(r) {
         if data := this.LV_GetItemParam(r)
-            return Object(data)
-        throw Exception("Bad row", -1, r)
+            return ObjFromPtrAddRef(data)
+        throw Error("Bad row", -1, r)
     }
     RowFromNode(obj) {
-        return this.LV_FindItemParam(&obj)
+        return this.LV_FindItemParam(ObjPtr(obj))
     }
     
     ;}
@@ -162,27 +166,27 @@ class TreeListView extends TreeListView._Base
     
     InsertChild(parent, i, child) {
         if !IsObject(child)
-            throw Exception("Invalid child", -1, child)
-        if (node := parent.children[i]) {
+            throw Error("Invalid child", -1, child)
+        if i < parent.children.Length {
             ; Insert before this node
-            r := this.RowFromNode(node)
+            r := this.RowFromNode(parent.children[i])
         }
         else if parent.expanded {
             ; Find the last visible descendent (parent if none)
             node := parent
-            while (n := node.children.Length()) && node.expanded
+            while (n := node.children.Length) && node.expanded
                 node := node.children[n]
             ; Insert after this node (if RowFromNode returns 0, it's likely the root)
             r := this.RowFromNode(node) + 1
         }
         parent.children.InsertAt(i, child)
         child.level := (parent == this.root) ? 0 : parent.level + 1
-        if r
+        if IsSet(r)
             this.InsertRow(r, child)
     }
     RemoveChild(parent, i) {
         if !(child := parent.children.RemoveAt(i))
-            throw Exception("No child at index " i, -1)
+            throw Error("No child at index " i, -1)
         if (r := this.RowFromNode(child))
             this.RemoveRow(r)
     }
@@ -209,30 +213,30 @@ class TreeListView extends TreeListView._Base
         node := this.NodeFromRow(r)
         static LVIR_LABEL := 2
         static LVM_GETSUBITEMRECT := 0x1038
-        VarSetCapacity(rect, 16, 0)
-        NumPut(LVIR_LABEL, rect, 0, "int")
-        NumPut(column-1, rect, 4, "int")
-        if !SendMessage(LVM_GETSUBITEMRECT, r-1, &rect,, "ahk_id " this.hLV)
+        rect := Buffer(16, 0)
+        NumPut("int", LVIR_LABEL, rect, 0)
+        NumPut("int", column-1, rect, 4)
+        if !SendMessage(LVM_GETSUBITEMRECT, r-1, rect.ptr,, this.hLV)
             return false
         this.EditRow := r
         this.EditColumn := column
         ; Scroll whole field into view if needed
         rL := NumGet(rect, 0, "int"), rR := NumGet(rect, 8, "int")
-        VarSetCapacity(client_rect, 16, 0)
-        DllCall("GetClientRect", "ptr", this.hLV, "ptr", &client_rect)
+        client_rect := Buffer(16, 0)
+        DllCall("GetClientRect", "ptr", this.hLV, "ptr", client_rect)
         client_width := NumGet(client_rect, 8, "int")
         if (rR > client_width) {
             delta := rR - client_width
             if (delta > rL)
                 delta := rL
             static LVM_SCROLL := 0x1014
-            SendMessage(LVM_SCROLL, delta, 0,, "ahk_id " this.hLV)
-            NumPut(rL - delta, rect, 0, "int")
-            NumPut(rR - delta, rect, 8, "int")
+            SendMessage(LVM_SCROLL, delta, 0,, this.hLV)
+            NumPut("int", rL - delta, rect, 0)
+            NumPut("int", rR - delta, rect, 8)
             Sleep 100
         }
         ; Convert coordinates
-        DllCall("MapWindowPoints", "ptr", this.hLV, "ptr", this.hGui, "ptr", &rect, "uint", 2)
+        DllCall("MapWindowPoints", "ptr", this.hLV, "ptr", this.hGui, "ptr", rect, "uint", 2)
         rL := NumGet(rect, 0, "int"), rT := NumGet(rect, 4, "int")
         rR := NumGet(rect, 8, "int"), rB := NumGet(rect, 12, "int")
         rW := rR - rL - 2, rH := rB - rT
@@ -244,11 +248,11 @@ class TreeListView extends TreeListView._Base
         ; Move the edit control into position and show it
         this.EditText := "" node.values[column]
         this.Edit.Value := this.EditText
-        this.Edit.Move("x" rL " y" rT " w" rW " h" rH)
+        this.Edit.Move(rL, rT, rW, rH)
         this.Edit.Visible := true
         this.Edit.Focus()
         static EM_SETSEL := 0xB1
-        SendMessage(EM_SETSEL, 0, -1,, "ahk_id " this.hEdit)
+        SendMessage(EM_SETSEL, 0, -1,, this.hEdit)
         return true
     }
     CancelEdit() {
@@ -258,7 +262,7 @@ class TreeListView extends TreeListView._Base
     }
     SaveEdit(reason:="") {
         if !(r := this.EditRow)
-            throw Exception("Not editing", -1)
+            throw Error("Not editing", -1)
         value := this.Edit.Value
         node := this.NodeFromRow(r)
         if this.EditText == "" value  ; Avoid erasing objects.
@@ -293,6 +297,8 @@ class TreeListView extends TreeListView._Base
     ;{ Keyboard Handling
     
     OnKeyDown(ctrl, key) {
+        if !this.HasMethod(ctrl "_Key_" key)
+            return
         if (ctrl = "LV") {
             if !(r := this.LV.GetNext(0, "F")) {
                 if (key = "Tab") {
@@ -302,9 +308,9 @@ class TreeListView extends TreeListView._Base
                 return
             }
             node := this.NodeFromRow(r)
+            return this.LV_Key_%key%(r, node)
         }
-        if type(this[ctrl "_Key_" key]) = "Func"
-            return this[ctrl "_Key_" key](r, node)
+        return this.%ctrl%_Key_%key%()
     }
     
     Edit_Key_Enter() {
@@ -428,13 +434,13 @@ class TreeListView extends TreeListView._Base
         }
         set {
             static LVM_GETITEMPOSITION := 0x1010, LVM_SCROLL := 0x1014
-            VarSetCapacity(pt, 8, 0)
-            SendMessage(LVM_GETITEMPOSITION, this.ScrollPos, &pt,, "ahk_id " this.hLV)
+            pt := Buffer(8, 0)
+            SendMessage(LVM_GETITEMPOSITION, this.ScrollPos, pt.ptr,, this.hLV)
             oldPixelY := NumGet(pt, 4, "int")
-            r := SendMessage(LVM_GETITEMPOSITION, value, &pt,, "ahk_id " this.hLV)
+            r := SendMessage(LVM_GETITEMPOSITION, value, pt.ptr,, this.hLV)
             newPixelY := NumGet(pt, 4, "int")
             if (r = 1)
-                SendMessage(LVM_SCROLL, 0, newPixelY - oldPixelY,, "ahk_id " this.hLV)
+                SendMessage(LVM_SCROLL, 0, newPixelY - oldPixelY,, this.hLV)
             return value
         }
     }
@@ -455,23 +461,23 @@ class TreeListView extends TreeListView._Base
     
     ;{ Static Message Handlers
     
-    OnWmDestroy(w, l, m, hwnd) {
-        for h, tlv in TreeListView.FromHwnd.Clone()
+    static OnWmDestroy(w, l, m, hwnd) {
+        for h, tlv in this.FromHwnd.Clone()
             if (tlv.hGui == hwnd && tlv.hLV == h)
                 tlv.OnDestroy()
     }
     
-    OnWmLButtonDown(wParam, lParam, msg, hwnd) {
-        if !(this := TreeListView.FromHwnd[hwnd])
+    static OnWmLButtonDown(wParam, lParam, msg, hwnd) {
+        if !(this := this.FromHwnd[hwnd])
          || (hwnd != this.hLV)
             return
         static LVM_SUBITEMHITTEST := 0x1039
         static LVHT_ONITEMICON := 2
         static LVHT_ONITEMLABEL := 4
-        VarSetCapacity(hti, 24, 0)
-        NumPut(lParam & 0xFFFF, hti, 0, "short")
-        NumPut(lParam >> 16, hti, 4, "short")
-        SendMessage(LVM_SUBITEMHITTEST, 0, &hti,, "ahk_id " this.hLV)
+        hti := Buffer(24, 0)
+        NumPut("short", lParam & 0xFFFF, hti, 0)
+        NumPut("short", lParam >> 16, hti, 4)
+        SendMessage(LVM_SUBITEMHITTEST, 0, hti.ptr,, this.hLV)
         where := NumGet(hti, 8, "int")
         r := NumGet(hti, 12, "int") + 1
         if (!r)
@@ -481,7 +487,7 @@ class TreeListView extends TreeListView._Base
             this.ExpandContract(r)
             return true
         }
-        if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.OnDoubleClick) {
+        if (where = LVHT_ONITEMLABEL && msg = 0x203 && this.HasProp('OnDoubleClick')) {
             if node := this.NodeFromRow(r)
                 this.OnDoubleClick(node)
             return true
@@ -493,10 +499,10 @@ class TreeListView extends TreeListView._Base
         }
     }
     
-    OnWmNotify(wParam, lParam) {
+    static OnWmNotify(wParam, lParam, *) {
         Critical 1000
         hwndFrom := NumGet(lParam+0, "ptr")
-        if !(this := TreeListView.FromHwnd[hwndFrom])
+        if !(this := this.FromHwnd[hwndFrom])
             return
         code := NumGet(lParam + A_PtrSize*2, "int")
         if (code = -180 || code = -181) { ; LVN_BEGINSCROLL || LVN_ENDSCROLL
@@ -514,16 +520,16 @@ class TreeListView extends TreeListView._Base
         }
     }
     
-    OnWmKeyDown(wParam, lParam, msg, hwnd) {
-        if !(this := TreeListView.FromHwnd[hwnd])
+    static OnWmKeyDown(wParam, lParam, msg, hwnd) {
+        if !(this := this.FromHwnd[hwnd])
         || !(ctrl := this.CtrlName[hwnd])
             return
         keyname := GetKeyName(Format("vk{:x}sc{:x}", wParam, (lParam >> 16) & 0x1FF))
         return this.OnKeyDown(ctrl, keyname)
     }
     
-    OnWmCommand(wParam, lParam) {
-        if !(this := TreeListView.FromHwnd[lParam])
+    static OnWmCommand(wParam, lParam, *) {
+        if !(this := this.FromHwnd[lParam])
             return
         static EN_KILLFOCUS := 0x200
         if ((wParam >> 16) = EN_KILLFOCUS) {
@@ -545,56 +551,44 @@ class TreeListView extends TreeListView._Base
     ; Based on LV_EX - http://ahkscript.org/boards/viewtopic.php?f=6&t=1256
     LV_GetColumnWidth(column) {
         static LVM_GETCOLUMNWIDTH := 0x101D
-        return SendMessage(LVM_GETCOLUMNWIDTH, column-1, 0,, "ahk_id " this.hLV)
+        return SendMessage(LVM_GETCOLUMNWIDTH, column-1, 0,, this.hLV)
     }
     LV_SetItemIndent(row, numIcons) {
         ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
         static OffIndent := 24 + (A_PtrSize * 3)
-        this.LV_LVITEM(LVITEM, 0x00000010, row) ; LVIF_INDENT
-        NumPut(numIcons, LVITEM, OffIndent, "Int")
-        return SendMessage(0x1006, 0, &LVITEM, , "ahk_id " this.hLV)
+        LVITEM := this.LV_LVITEM(0x00000010, row) ; LVIF_INDENT
+        NumPut("Int", numIcons, LVITEM, OffIndent)
+        return SendMessage(0x1006, 0, LVITEM.ptr, , this.hLV)
     }
     LV_GetItemParam(row) {
         ; LVM_GETITEM -> http://msdn.microsoft.com/en-us/library/bb774953(v=vs.85).aspx
-        static LVM_GETITEM := A_IsUnicode ? 0x104B : 0x1005 ; LVM_GETITEMW : LVM_GETITEMA
+        static LVM_GETITEM := 0x104B ; LVM_GETITEMW
         static OffParam := 24 + (A_PtrSize * 2)
-        this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
-        SendMessage(LVM_GETITEM, 0, &LVITEM, , "ahk_id " this.hLV)
+        LVITEM := this.LV_LVITEM(0x00000004, row) ; LVIF_PARAM
+        SendMessage(LVM_GETITEM, 0, LVITEM.ptr, , this.hLV)
         return NumGet(LVITEM, OffParam, "UPtr")
     }
     LV_SetItemParam(row, value) {
         ; LVM_SETITEMA = 0x1006 -> http://msdn.microsoft.com/en-us/library/bb761186(v=vs.85).aspx
         static OffParam := 24 + (A_PtrSize * 2)
-        this.LV_LVITEM(LVITEM, 0x00000004, row) ; LVIF_PARAM
-        NumPut(value, LVITEM, OffParam, "UPtr")
-        return SendMessage(0x1006, 0, &LVITEM, , "ahk_id " this.hLV)
+        LVITEM := this.LV_LVITEM(0x00000004, row) ; LVIF_PARAM
+        NumPut("UPtr", value, LVITEM, OffParam)
+        return SendMessage(0x1006, 0, LVITEM.ptr, , this.hLV)
     }
     LV_FindItemParam(param, start := 0) { ; Based on LV_EX_FindString
         ; LVM_FINDITEMA = 0x100D -> http://msdn.microsoft.com/en-us/library/bb774903
         static LVFISize := 40
-        VarSetCapacity(LVFI, LVFISize, 0) ; LVFINDINFO
-        NumPut(0x1, LVFI, 0, "UInt") ; LVFI_PARAM
-        NumPut(param, LVFI, A_PtrSize * 2, "Ptr") ; lParam
-        r := SendMessage(0x100D, (start - 1), &LVFI, , "ahk_id " this.hLV)
+        LVFI := Buffer(LVFISize, 0) ; LVFINDINFO
+        NumPut("UInt", 0x1, LVFI, 0) ; LVFI_PARAM
+        NumPut("Ptr", param, LVFI, A_PtrSize * 2) ; lParam
+        r := SendMessage(0x100D, (start - 1), LVFI.ptr, , this.hLV)
         return (r > 0x7FFFFFFF ? 0 : r + 1)
     }
-    LV_LVITEM(ByRef LVITEM, mask := 0, row := 1, col := 1) {
+    LV_LVITEM(mask := 0, row := 1, col := 1) {
         static LVITEMSize := 48 + (A_PtrSize * 3)
-        VarSetCapacity(LVITEM, LVITEMSize, 0)
-        NumPut(mask, LVITEM, 0, "UInt"), NumPut(row - 1, LVITEM, 4, "Int"), NumPut(col - 1, LVITEM, 8, "Int")
-    }
-    
-    ;}
-    
-    ;{ General Utility
-    
-    class _Base {
-        __call(name:="") {
-            throw Exception("Unknown method", -1, name)
-        }
-        _NewEnum() { ; Allow enumeration for debugging.
-            return ObjNewEnum(this)
-        }
+        LVITEM := Buffer(LVITEMSize, 0)
+        NumPut("uint", mask, "int", row - 1, "int", col - 1, LVITEM)
+        return LVITEM
     }
     
     ;}

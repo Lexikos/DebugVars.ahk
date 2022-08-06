@@ -1,37 +1,39 @@
 #Include TreeListView.ahk
 
-Gui := GuiCreate("-DPIScale")
-Gui.OnEvent("Close", "GuiEscape")
-Gui.OnEvent("Escape", "GuiEscape")
+TestGui := Gui("-DPIScale")
+TestGui.OnEvent("Close", GuiEscape)
+TestGui.OnEvent("Escape", GuiEscape)
 testobj := {one: [1,2,3], two: {foo: 1, bar: 2, baz: 3}}
-tlv := new TreeListViewTest(Gui, TestNode(testobj), "w600 h400", "One|Two|Three")
+tlv := TreeListViewTest(TestGui, TestNode(testobj), "w600 h400", ["One","Two","Three"])
 tlv.MinEditColumn := 1
 tlv.MaxEditColumn := 3
-Gui.AddButton(, "test button")
-Gui.Show()
+TestGui.AddButton(, "test button")
+TestGui.Show()
 
 ; For testing cleanup of nodes (on control destruction
 ; or when object (value 2) is replaced with string):
-; tlv.root.children[3].children.push(new RefCountTestNode)
+; tlv.root.children[3].children.push(RefCountTestNode())
 tlv.InsertChild(tlv.root, 3, nz := TestNode([], "z"))
-tlv.InsertChild(nz, 1, new RefCountTestNode), nz := ""
+tlv.InsertChild(nz, 1, RefCountTestNode()), nz := ""
 class RefCountTestNode {
     values := ["One", "Two"]
+    expandable := false
+    expanded := false
     __delete() {
         MsgBox "Delete RefCountTestNode"
     }
 }
 
-#If WinActive("TreeListView_Test.ahk ahk_class AutoHotkeyGUI")
+#HotIf WinActive("TreeListView_test.ahk ahk_class AutoHotkeyGUI")
 
 tlv.InsertChild(tlv.root, 2, TestNode("bar", "foo"))
 F4::tlv.RemoveChild(tlv.root.children[3], 2)
 
 F5::tlv.Reset()
 
-GuiEscape() {
+GuiEscape(*) {
     global
-    Gui.Destroy()
+    TestGui.Destroy()
     tlv := ""
     ExitApp
 }
@@ -47,7 +49,7 @@ class TreeListViewTest extends TreeListView {
         ; not editable.
         if (c != "" && InStr(this.LV.GetText(r, c), "object"))
             return false
-        return base.CanEdit(r, c)
+        return super.CanEdit(r, c)
     }
 }
 
@@ -56,24 +58,21 @@ class TreeListViewTest extends TreeListView {
 ; linked (i.e. replacing the initial "Object" value does not affect the
 ; child nodes).
 TestNode(value, name:="") {
-    this := {}
-    this.values := [GetValueString(name), GetValueString(value)]
+    this := {expandable: false, expanded: false}
+    this.values := [GetValueString(name), GetValueString(value), ""]
     if IsObject(value) {
         this.expandable := true
         this.children := []
-        for k,v in value
+        for k,v in ObjOwnProps(value)
             this.children.Push(TestNode(v, k))
+        if value.HasMethod('__enum')
+            for k,v in value
+                this.children.Push(TestNode(v, k))
     }
     return this
 }
 
 GetValueString(value) {
-    if IsObject(value) {
-        try if value.ToString
-            return value.ToString()
-        try if className := value.__Class
-            return className
-        return "Object"
-    }
-    return value
+    try return String(value)
+    return Type(value)
 }
