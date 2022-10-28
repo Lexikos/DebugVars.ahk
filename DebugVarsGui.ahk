@@ -6,12 +6,12 @@ DvInspectProperty(dbg, fullname, extra_args:="", show_opt:="") {
     dbg.feature_set("-n max_depth -v 1")
     ; 1MB seems reasonably permissive.  Note that -m 0 (unlimited
     ; according to the spec) doesn't work with v1.1.24.02 and earlier.
-    dbg.property_get("-m 1048576 -n " fullname (extra_args="" ? "" : " " extra_args), response)
+    response := dbg.property_get("-m 1048576 -n " fullname (extra_args="" ? "" : " " extra_args))
     dbg.feature_set("-n max_depth -v 0")
     prop := DvLoadXml(response).selectSingleNode("/response/property")
     
     if (prop.getAttribute("name") = "(invalid)") {
-        MsgBox, 48,, Invalid variable name: %fullname%
+        MsgBox "Invalid variable name: " fullname,, "Icon!"
         return false
     }
     
@@ -19,10 +19,10 @@ DvInspectProperty(dbg, fullname, extra_args:="", show_opt:="") {
     if (type != "object") {
         isReadOnly := prop.getAttribute("facet") = "Builtin"
         value := DBGp_Base64UTF8Decode(prop.text)
-        dv := new DebugVarGui(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
+        dv := DebugVarGui(dbg, {name: fullname, value: value, type: type, readonly: isReadOnly})
     }
     else {
-        dv := new DebugVarsGui(new DvPropertyNode(dbg, prop))
+        dv := DebugVarsGui(DvPropertyNode(dbg, prop))
     }
     dv.Show(show_opt)
 }
@@ -30,7 +30,7 @@ DvInspectProperty(dbg, fullname, extra_args:="", show_opt:="") {
 class DebugVarGui extends VarEditGui
 {
     __New(dbg, var) {
-        base.__New(var)
+        super.__New(var)
         this.dbg := dbg
     }
     
@@ -42,24 +42,27 @@ class DebugVarGui extends VarEditGui
     }
 }
 
-DvSetProperty(dbg, fullname, ByRef value, type, ByRef response:="") {
+DvSetProperty(dbg, fullname, value, type) {
     if (type = "integer")
         value := format("{:i}", value) ; Force decimal format.
     if (type = "integer" || type = "float") && dbg.no_base64_numbers
         data := value
     else
         data := DBGp_Base64UTF8Encode(value)
-    dbg.property_set("-n " fullname " -t " type " -- " data, response)
+    return dbg.property_set("-n " fullname " -t " type " -- " data)
 }
 
-class DvNodeBase extends TreeListView._Base
+class DvNodeBase
 {
+    static prototype.expandable := false
+    static prototype.children := ""
+    
     expanded {
         set {
             if value {
                 ; Expanded for the first time: populate.
                 this.children := this.GetChildren()
-                ObjRawSet(this, "expanded", true)
+                this.DefineProp 'expanded', {value: true}
             }
             return value
         }
@@ -73,13 +76,15 @@ class DvNodeBase extends TreeListView._Base
     }
     
     Clone() {
-        node := ObjClone(this)
+        node := super.Clone()
         node.children := this.GetChildren()
         return node
     }
     
     Update(tlv) {
-        for i, child in this.children
+        if !this.HasProp('children')
+            return
+        for child in this.children
             child.Update(tlv)
     }
 }
@@ -98,7 +103,7 @@ class DvPropertyParentNode extends DvNodeBase
             if (np < props.length) {
                 prop := props.item(np)
                 if (nc > children.Length() || prop.getAttribute("name") < children[nc].name) {
-                    tlv.InsertChild(this, nc, new DvPropertyNode(this.dbg, prop))
+                    tlv.InsertChild(this, nc, DvPropertyNode(this.dbg, prop))
                     ++nc, ++np
                     continue
                 }
@@ -124,8 +129,8 @@ class DvPropertyNode extends DvPropertyParentNode
         this.xml := prop
         props := prop.selectNodes("property")
         if props.length {
-            this.children := this.FromXmlNodes(props, dbg)
-            ObjRawSet(this, "expanded", false)
+            this.children := DvPropertyNode.FromXmlNodes(props, dbg)
+            this.DefineProp 'expanded', {value: false}
         }
         else {
             this._value := DBGp_Base64UTF8Decode(prop.text)
@@ -144,10 +149,10 @@ class DvPropertyNode extends DvPropertyParentNode
         }
     }
     
-    FromXmlNodes(props, dbg) {
+    static FromXmlNodes(props, dbg) {
         nodes := []
         for prop in props
-            nodes.Push(new DvPropertyNode(dbg, prop))
+            nodes.Push(DvPropertyNode(dbg, prop))
         return nodes
     }
     
@@ -159,7 +164,7 @@ class DvPropertyNode extends DvPropertyParentNode
     
     GetProperty() {
         this.dbg.feature_set("-n max_depth -v 1")
-        this.dbg.property_get("-n " this.fullname, response)
+        response := this.dbg.property_get("-n " this.fullname)
         this.dbg.feature_set("-n max_depth -v 0")
         xml := DvLoadXml(response)
         return this.xml := xml.selectSingleNode("/response/property")
@@ -188,15 +193,17 @@ class DvPropertyNode extends DvPropertyParentNode
         return title
     }
     
-    SetValue(ByRef value) {
+    SetValue(value) {
         type := this.xml.getAttribute("type") ; Try to match type of previous value.
         if (type = "float" || type = "integer") && value+0 != ""
             type := InStr(value, ".") ? "float" : "integer"
         else
             type := "string"
-        DvSetProperty(this.dbg, this.xml.getAttribute("fullname")
-            , value, type, response)
-        if InStr(response, "<error") || InStr(response, "success=""0""")
+        try
+            response := DvSetProperty(this.dbg, this.xml.getAttribute("fullname"), value, type)
+        catch DbgpError
+            return false
+        else if InStr(response, 'success="0"')
             return false
         ; Update .xml for @classname and @children, and in case the value
         ; differs from what we set (e.g. for setting A_KeyDelay in v2).
@@ -222,7 +229,7 @@ class DvPropertyNode extends DvPropertyParentNode
 
 class DvContextNode extends DvPropertyParentNode
 {
-    static expandable := true
+    static prototype.expandable := true
     
     __new(dbg, context) {
         this.dbg := dbg
@@ -236,7 +243,7 @@ class DvContextNode extends DvPropertyParentNode
     }
     
     GetProperties() {
-        this.dbg.context_get("-c " this.context, response)
+        response := this.dbg.context_get("-c " this.context)
         xml := DvLoadXml(response)
         return xml.selectNodes("/response/property")
     }
@@ -258,7 +265,7 @@ class DvContextNode extends DvPropertyParentNode
 
 class Dv2ContextsNode extends DvNodeBase
 {
-    static expandable := true
+    static prototype.expandable := true
     
     __new(dbg) {
         this.dbg := dbg
@@ -267,8 +274,8 @@ class Dv2ContextsNode extends DvNodeBase
     GetChildren() {
         children := []
         Loop 2 {
-            children[A_Index] := new DvContextNode(this.dbg, A_Index-1)
-            children[A_Index].expanded := true
+            children.Push(node := DvContextNode(this.dbg, A_Index-1))
+            node.expanded := true
         }
         return children
     }
@@ -280,20 +287,12 @@ class Dv2ContextsNode extends DvNodeBase
 
 class DebugVarsGui extends VarTreeGui
 {
-    Show(options:="", title:="") {
-        return base.Show(options
-            , title != "" ? title : this.TLV.root.GetWindowTitle())
-    }
-    
-    UnregisterHwnd() {
-        base.UnregisterHwnd()
-        this.SetAutoRefresh(0)
-    }
+    AddVarTree(p*) => DebugVarsGui.Control(this, p*)
     
     class Control extends VarTreeGui.Control
     {
         LV_Key_F5() {
-            VarTreeGui.Instances[this.hGui].Refresh()
+            this.LV.Gui.Refresh()
         }
         
         LV_Key_Enter(r, node) {
@@ -302,37 +301,25 @@ class DebugVarsGui extends VarTreeGui
     }
     
     OnContextMenu(node, isRightClick, x, y) {
-        try Menu DvContext, DeleteAll  ; In case we're interrupting a prior call.
-        if node.base != DvPropertyNode
-            Menu DvContext, Add, New window, DV_CM_NewWindow
+        m := Menu()
+        if !(node is DvPropertyNode)
+            m.Add "New window", (*) => this.NewWindow(node)
         else
-            Menu DvContext, Add, Inspect, DV_CM_InspectNode
-        Menu DvContext, Add, Refresh, DV_CM_Refresh
-        Menu DvRefresh, Add, Off, DV_CM_AutoRefresh
-        Menu DvRefresh, Add, 0.5 s, DV_CM_AutoRefresh
-        Menu DvRefresh, Add, 1.0 s, DV_CM_AutoRefresh
-        Menu DvRefresh, Add, 5.0 s, DV_CM_AutoRefresh
-        static refresh_intervals := [0, 500, 1000, 5000]
-        for i, interval in refresh_intervals
-            Menu DvRefresh, % interval=this.refresh_interval ? "Check" : "Uncheck", %i%&
-        Menu DvContext, Add, Auto refresh, :DvRefresh
-        Menu DvContext, Show, % x, % y
-        try Menu DvContext, Delete
-        return
-        DV_CM_NewWindow:
-        DV_CM_InspectNode:
-        this[SubStr(A_ThisLabel,7)](node)
-        return
-        DV_CM_Refresh:
-        this.Refresh()
-        return
-        DV_CM_AutoRefresh:
-        this.SetAutoRefresh(refresh_intervals[A_ThisMenuItemPos])
-        return
+            m.Add "Inspect", (*) => this.InspectNode(node)
+        m.Add "Refresh", (*) => this.Refresh()
+        mr := Menu()
+        static refresh_intervals := Map("Off", 0, "0.5 s", 500, "1.0 s", 1000, "5.0 s", 5000)
+        for text, interval in refresh_intervals {
+            mr.Add text, ((n, *) => this.SetAutoRefresh(n)).Bind(interval)
+            if interval = this.refresh_interval
+                mr.Check text
+        }
+        m.Add "Auto refresh", mr
+        m.Show x, y
     }
     
     OnDoubleClick(node) {
-        if node.base != DvPropertyNode
+        if !(node is DvPropertyNode)
             this.NewWindow(node)
         else
             this.InspectNode(node)
@@ -343,39 +330,43 @@ class DebugVarsGui extends VarTreeGui
     }
     
     NewWindow(node) {
-        dv := new this.base(node.Clone())
+        dv := DebugVarsGui(node.Clone())
         dv.Show()
     }
     
     refresh_interval := 0
     SetAutoRefresh(interval) {
         this.refresh_interval := interval
-        timer := this.timer
+        timer := this.HasProp('timer') ? this.timer : ""
         if !interval {
             if timer {
-                SetTimer % timer, Delete
+                SetTimer timer, 0
                 this.timer := ""
             }
-            return 
+            return
         }
         if !timer
-            this.timer := timer := ObjBindMethod(this, "Refresh")
-        SetTimer % timer, % interval
+            this.timer := timer := ObjBindMethod(this, "Refresh", true)
+        SetTimer timer, interval
     }
     
-    Refresh() {
+    Refresh(auto:=false) {
+        if auto && !DllCall("IsWindowVisible", "ptr", this.hwnd)
+            ; @Debug-Output => DebugVarsGui refreshed when not visible; turning off now.
+            return this.SetAutoRefresh(0)
         this.TLV.root.Update(this.TLV)
-        WinSetTitle % "ahk_id " this.hGui,, % this.TLV.root.GetWindowTitle()
+        this.Title := this.TLV.root.GetWindowTitle()
     }
 }
 
 DvRefreshAll() {
-    for hwnd, dv in VarTreeGui.Instances
-        dv.Refresh()
+    for hwnd in WinGetList("ahk_class AutoHotkeyGui ahk_pid " ProcessExist())
+        if (g := GuiFromHwnd(hwnd)) && g is DebugVarsGui
+            g.Refresh()
 }
 
-DvLoadXml(ByRef data) {
-    o := ComObjCreate("MSXML2.DOMDocument")
+DvLoadXml(data) {
+    o := ComObject("MSXML2.DOMDocument")
     o.async := false
     o.setProperty("SelectionLanguage", "XPath")
     o.loadXml(data)

@@ -5,7 +5,7 @@
     VarTreeGui
     
     Public interface:
-        vtg := new VarTreeGui(RootNode)
+        vtg := VarTreeGui(RootNode)
         vtg.TLV
         vtg.Show()
         vtg.Hide()
@@ -21,9 +21,11 @@ class VarTreeGui extends Gui
         this.OnEvent("ContextMenu", "ContextMenu")
         this.MarginX := 0
         this.MarginY := 0
-        this.TLV := VarTreeGui.Control(this, RootNode
+        this.TLV := this.AddVarTree(RootNode
             , "w" 500*(A_ScreenDPI/96) " h" 300*(A_ScreenDPI/96) " LV0x10000 -LV0x10 -Multi", ["Name","Value"]) ; LV0x10 = LVS_EX_HEADERDRAGDROP
     }
+    
+    AddVarTree(p*) => VarTreeGui.Control(this, p*)
     
     class Control extends TreeListView
     {
