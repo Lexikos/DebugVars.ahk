@@ -292,7 +292,7 @@ class DebugVarsGui extends VarTreeGui
     class Control extends VarTreeGui.Control
     {
         LV_Key_F5() {
-            this.LV.Gui.Refresh()
+            this.Gui.Refresh()
         }
         
         LV_Key_Enter(r, node) {

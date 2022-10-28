@@ -35,19 +35,29 @@ class VarTreeGui extends Gui
         MaxEditColumn := 2
         
         AutoSizeValueColumn() {
-            this.LV.ModifyCol(this.COL_VALUE, "AutoHdr")
+            this.ModifyCol(this.COL_VALUE, "AutoHdr")
         }
         
         AfterPopulate() {
-            this.LV.ModifyCol(this.COL_NAME, 150*(A_ScreenDPI/96))
+            this.ModifyCol(this.COL_NAME, 150*(A_ScreenDPI/96))
             this.AutoSizeValueColumn()
-            if !this.LV.GetNext(,"F")
-                this.LV.Modify(1, "Focus")
+            if !this.getNext(,"F")
+                this.modify(1, "Focus")
         }
         
         ExpandContract(r) {
             super.ExpandContract(r)
             this.AutoSizeValueColumn()  ; Adjust for +/-scrollbars
+        }
+
+        RegisterEvents() {
+            super.RegisterEvents()
+            this.OnNotify(-326, (this, lParam) => ( ; HDN_BEGINTRACKW
+                this.BeforeHeaderResize(NumGet(lParam + A_PtrSize*3, "int") + 1)
+            ))
+            this.OnNotify(-327, (this, lParam) => ( ; HDN_ENDTRACKW
+                this.AfterHeaderResize(NumGet(lParam + A_PtrSize*3, "int") + 1)
+            ))
         }
         
         BeforeHeaderResize(column) {
@@ -55,7 +65,7 @@ class VarTreeGui extends Gui
                 return true
             ; Collapse to fit just the value so that scrollbars will be
             ; visible only when needed.
-            this.LV.ModifyCol(this.COL_VALUE, "Auto")
+            this.modifyCol(this.COL_VALUE, "Auto")
         }
         
         AfterHeaderResize(column) {
@@ -69,10 +79,10 @@ class VarTreeGui extends Gui
                 return
             if !(r := this.RowFromNode(node))
                 return
-            this.LV.Modify(r, "Col" column, value)
+            this.modify(r, "Col" column, value)
             if (!node.expandable && node.children) {
                 ; Since value is a string, node can't be expanded
-                this.LV.Modify(r, "Icon1")
+                this.modify(r, "Icon1")
                 this.RemoveChildren(r+1, node)
                 node.children := ""
                 node.expanded := false
@@ -80,14 +90,14 @@ class VarTreeGui extends Gui
         }
         
         OnDoubleClick(node) {
-            g := GuiFromHwnd(this.hGui)
+            g := this.Gui
             if g && g.HasMethod('OnDoubleClick')
                 g.OnDoubleClick(node)
         }
     }
     
     ContextMenu(ctrl, eventInfo, isRightClick, x, y) {
-        if (ctrl != this.TLV.LV || !this.HasMethod('OnContextMenu'))
+        if (ctrl != this.TLV || !this.HasMethod('OnContextMenu'))
             return
         node := eventInfo ? this.TLV.NodeFromRow(eventInfo) : ""
         this.OnContextMenu(node, isRightClick, x, y)

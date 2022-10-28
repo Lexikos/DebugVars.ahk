@@ -40,14 +40,14 @@ GuiEscape(*) {
 
 class TreeListViewTest extends TreeListView {
     AfterPopulate() {
-        this.LV.ModifyCol(1, 150)
-        this.LV.ModifyCol(2, "AutoHdr")
-        this.LV.ModifyCol(3, "AutoHdr")
+        this.modifyCol(1, 150)
+        this.modifyCol(2, "AutoHdr")
+        this.modifyCol(3, "AutoHdr")
     }
     CanEdit(r, c:="") {
         ; This is just to show how tabbing works when some cells are
         ; not editable.
-        if (c != "" && InStr(this.LV.GetText(r, c), "object"))
+        if (c != "" && InStr(this.getText(r, c), "object"))
             return false
         return super.CanEdit(r, c)
     }
