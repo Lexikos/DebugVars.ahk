@@ -1,6 +1,6 @@
 # DebugVars
 
-DebugVars is a script for AutoHotkey v1.1 which allows users to view and edit variables of other scripts while they are running.
+DebugVars is a script for AutoHotkey v2.0 which allows users to view and edit variables of other scripts while they are running.
 
 The primary purpose of this project is to provide reusable components for use in other projects, such as for integration in various editors.  DebugVars serves as a demonstration of how to implement these components.  Any code included in this project may be freely modified and/or reused.
 
