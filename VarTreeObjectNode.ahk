@@ -32,7 +32,8 @@ class VarTreeObjectNode
     }
     
     _GetValueString(value) {
-        try return String(value)
+        if value is Primitive || value.HasMethod('ToString')
+            return String(value)
         return Type(value)
     }
     
