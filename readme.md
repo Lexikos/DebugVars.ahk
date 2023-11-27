@@ -4,7 +4,7 @@ DebugVars is a script for AutoHotkey v2.0 which allows users to view and edit va
 
 The primary purpose of this project is to provide reusable components for use in other projects, such as for integration in various editors.  DebugVars serves as a demonstration of how to implement these components.  Any code included in this project may be freely modified and/or reused.
 
-Before running the script, ensure that [dbgp.ahk](https://github.com/Lexikos/dbgp) is installed in your function library (Lib directory), or save it at `.\Lib\dbgp.ahk`, where `.` is the directory containing DebugVars.ahk.
+Before running the script, ensure that [dbgp.ahk](https://github.com/Lexikos/dbgp/tree/two) is installed in your function library (Lib directory), or save it at `.\Lib\dbgp.ahk`, where `.` is the directory containing DebugVars.ahk.
 
 To start using the script, run DebugVars.ahk.
 
